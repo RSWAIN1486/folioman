@@ -10,6 +10,7 @@ import { api } from '@/api/client'
  */
 export const useMetaStore = defineStore('meta', () => {
   const readOnly = ref(false)
+  const storage = ref<'local' | 'server'>('server')
   const loaded = ref(false)
 
   async function ensureLoaded(): Promise<void> {
@@ -17,9 +18,10 @@ export const useMetaStore = defineStore('meta', () => {
     const res = await api.GET('/api/meta')
     if (res.data) {
       readOnly.value = res.data.read_only
+      storage.value = res.data.storage === 'local' ? 'local' : 'server'
       loaded.value = true
     }
   }
 
-  return { readOnly, loaded, ensureLoaded }
+  return { readOnly, storage, loaded, ensureLoaded }
 })

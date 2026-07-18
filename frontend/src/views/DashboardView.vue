@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import Button from 'primevue/button'
 import IntegrityHealthCard from '@/components/IntegrityHealthCard.vue'
 import DeltaChip from '@/components/DeltaChip.vue'
 import AssetClassSummary from '@/views/dashboard/AssetClassSummary.vue'
 import { useDashboard, type RangeKey } from '@/composables/useDashboard'
 import { RANGES } from '@/utils/portfolio'
 import { useCountUp } from '@/composables/useCountUp'
+import { useMetaStore } from '@/stores/meta'
 import { useRosterStore } from '@/stores/roster'
 import { useUiStore } from '@/stores/ui'
 import { formatInr, formatInrCompact } from '@/utils/format'
@@ -20,6 +22,7 @@ const PortfolioValueChart = defineAsyncComponent(
 const SelectButton = defineAsyncComponent(() => import('primevue/selectbutton'))
 
 const route = useRoute()
+const meta = useMetaStore()
 const roster = useRosterStore()
 const ui = useUiStore()
 const loadCharts = ref(false)
@@ -57,8 +60,9 @@ const investorName = computed(() => roster.investorName(investorId.value) ?? 'In
 
 // Live summary + the full net-worth series (fetched once); the range toggle just
 // windows it client-side via `valueWindow`, and the chart's slider can free-zoom.
-const { summary, rollup, range, setRange, valueWindow, valuationReady, loading } =
+const { summary, rollup, range, setRange, valueWindow, valuationReady, loading, refreshingPrices, refreshPrices } =
   useDashboard(investorId)
+const showRefreshButton = computed(() => meta.loaded && !meta.readOnly)
 
 // Axis tick density follows the active range's sampling (see RANGES).
 const valueGranularity = computed(() => RANGES[range.value].granularity)
@@ -131,7 +135,7 @@ const allocationData = computed(() =>
 <template>
   <section class="dashboard" :class="{ 'is-loading': loading }">
     <header class="page-head">
-      <div>
+      <div class="page-head-copy">
         <h1>Dashboard</h1>
         <p class="sub">
           {{ investorName }} ·
@@ -147,6 +151,17 @@ const allocationData = computed(() =>
           <template v-else>{{ summary.asOf }}</template>
         </p>
       </div>
+      <Button
+        v-if="showRefreshButton"
+        label="Refresh prices"
+        icon="pi pi-refresh"
+        size="small"
+        severity="secondary"
+        outlined
+        :loading="refreshingPrices"
+        :disabled="refreshingPrices"
+        @click="refreshPrices"
+      />
     </header>
 
     <!-- Hero: net worth + the value-over-time chart as the main card. -->
@@ -300,7 +315,15 @@ const allocationData = computed(() =>
 }
 
 .page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fm-space-3);
+  flex-wrap: wrap;
   margin-bottom: 0;
+}
+.page-head-copy {
+  min-width: 0;
 }
 .page-head h1 {
   margin: 0;

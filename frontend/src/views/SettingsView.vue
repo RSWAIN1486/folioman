@@ -349,7 +349,10 @@ async function exportTransactions(): Promise<void> {
     </template>
 
     <!-- NAV freshness: per-security price currency + manual refresh -->
-    <NavFreshnessPanel v-else-if="activeTab === 'navs'" />
+    <NavFreshnessPanel
+      v-else-if="activeTab === 'navs'"
+      :manual-refresh-allowed="!!meta && !meta.read_only"
+    />
 
     <!-- Jobs & valuation activity -->
     <template v-else>

@@ -4,10 +4,10 @@ import { createPinia, setActivePinia } from 'pinia'
 
 // Route api.GET by path so both useDashboard (summary + value-series) and the
 // integrity store it reads resolve against fixtures.
-const { get } = vi.hoisted(() => ({ get: vi.fn() }))
-vi.mock('@/api/client', () => ({ api: { GET: get } }))
+const { get, post, notify } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), notify: vi.fn() }))
+vi.mock('@/api/client', () => ({ api: { GET: get, POST: post } }))
 // The composable toasts via the ui store; stub it.
-vi.mock('@/stores/ui', () => ({ useUiStore: () => ({ notify: vi.fn() }) }))
+vi.mock('@/stores/ui', () => ({ useUiStore: () => ({ notify }) }))
 
 import { useDashboard } from './useDashboard'
 
@@ -101,6 +101,8 @@ describe('useDashboard', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     get.mockReset()
+    post.mockReset()
+    notify.mockReset()
     get.mockImplementation((path: string) => routeGet(path))
   })
 
@@ -229,5 +231,28 @@ describe('useDashboard', () => {
     await flush()
 
     expect(summary.value.xirr).toBeNull()
+  })
+
+  it('refreshes prices on demand and reloads the dashboard summary', async () => {
+    post.mockResolvedValue({ data: { updated: 1, skipped: 0, errors: 0, freshness: {} } })
+
+    const { summary, refreshPrices, refreshingPrices } = useDashboard(ref(1))
+    await flush()
+    await flush()
+
+    get.mockImplementation((path: string) =>
+      path.endsWith('/summary')
+        ? Promise.resolve({ data: { ...SUMMARY, total_inr: '8100', day_change_inr: '90' } })
+        : routeGet(path),
+    )
+
+    expect(refreshingPrices.value).toBe(false)
+    await expect(refreshPrices()).resolves.toBe(true)
+    expect(post).toHaveBeenCalledWith('/api/navs/refresh', {})
+    expect(summary.value.netWorth).toBe(8100)
+    expect(refreshingPrices.value).toBe(false)
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'success', summary: 'Prices refreshed' }),
+    )
   })
 })

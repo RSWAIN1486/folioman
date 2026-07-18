@@ -40,6 +40,7 @@ describe('meta store', () => {
     const meta = useMetaStore()
     await meta.ensureLoaded()
     expect(meta.readOnly).toBe(true)
+    expect(meta.storage).toBe('server')
     expect(meta.loaded).toBe(true)
   })
 

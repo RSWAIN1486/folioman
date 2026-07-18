@@ -16,8 +16,8 @@ uv run --extra server python -m folioman_server           # serve (gunicorn)
 
 It boots gunicorn (`gthread` workers) over the Django WSGI app under
 `settings.server`, so the fail-closed startup guards apply — set
-`FOLIOMAN_SECRET_KEY`, `FOLIOMAN_FERNET_KEY`, and the Postgres `FOLIOMAN_DB_*`
-vars first (see [configuration](README.md#environment-variables)). Bind/workers
+`FOLIOMAN_SECRET_KEY`, `FOLIOMAN_FERNET_KEY`, and `DATABASE_URL`
+first (see [configuration](README.md#environment-variables)). Bind/workers
 come from the environment:
 
 | Variable | Default | Purpose |
@@ -32,6 +32,49 @@ come from the environment:
 Liveness/readiness is `GET /api/health` — unauthenticated, returns `200`
 (`{"status":"ok","database":"ok"}`) when the DB is reachable, `503` otherwise.
 Use it for the container `HEALTHCHECK` and any uptime monitor.
+
+## Local source run
+
+For a local repo checkout, the `uv run --extra server ...` commands above read a
+root `.env` automatically (`folioman_app._env` loads `.env` from the current
+working directory / its ancestors). `server/.env` is only for Docker Compose.
+
+The shortest working path is:
+
+```bash
+make pg-up                          # starts postgres:17 on localhost:5432
+make frontend-build                 # rebuild the hosted SPA if frontend changed
+cat > .env <<'EOF'
+DATABASE_URL=postgresql://folioman:folioman@127.0.0.1:5432/folioman
+FOLIOMAN_SECRET_KEY=replace-with-a-local-secret
+FOLIOMAN_FERNET_KEY=replace-with-a-local-fernet-key
+FOLIOMAN_ALLOWED_HOSTS=localhost,127.0.0.1
+EOF
+uv run --extra server python -m folioman_server migrate
+# terminal 1: the HTTP app
+uv run --extra server python -m folioman_server
+# terminal 2: the valuation/NAV scheduler
+uv run --extra server python -m folioman_server run-scheduler
+```
+
+Server source-runs need both long-lived processes. `folioman_server` serves the
+SPA + API, while `run-scheduler` does the catch-up valuation work and the 30s /
+6-hour background ticks. If you start only the HTTP app, the dashboard can stay
+`provisional` with a single-point chart and blank XIRR / 1D return after an import.
+
+Generate the two secrets with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Open `http://127.0.0.1:8000/` and verify the health endpoint separately if
+needed:
+
+```bash
+curl http://127.0.0.1:8000/api/health
+```
 
 ## Docker image (app + Postgres)
 

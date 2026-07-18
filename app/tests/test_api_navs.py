@@ -7,6 +7,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from folioman_app.models import NAVHistory
 
@@ -131,3 +132,57 @@ def test_freshness_reports_history_range_and_refresh_schedule(
     # today (a run scheduled for the current hour has already fired).
     assert body["next_refresh_at"].startswith("2025-06-04T16:00:00")
     assert body["last_refreshed_at"] is not None
+
+
+def test_manual_refresh_scopes_to_the_advisors_book_and_returns_updated_freshness(
+    client, make_investor, make_security, make_holding, freeze_today, monkeypatch
+):
+    inv = make_investor()
+    owned = make_security(name="Owned Fund")
+    make_holding(investor=inv, security=owned)
+
+    other_user = get_user_model().objects.create_user(username="other")
+    other_inv = make_investor(name="Other Investor", owned_by=other_user)
+    other_sec = make_security(name="Other Fund")
+    make_holding(investor=other_inv, security=other_sec)
+
+    calls: dict[str, list] = {"mf": [], "eq": [], "refresh": [], "recompute": []}
+
+    def _ids(securities) -> list[int]:
+        return list(securities.values_list("id", flat=True))
+
+    monkeypatch.setattr(
+        "folioman_app.api.navs.backfill_missing_history",
+        lambda *, securities: calls["mf"].append(_ids(securities)) or {"points": 0},
+    )
+    monkeypatch.setattr(
+        "folioman_app.api.navs.backfill_missing_equity_history",
+        lambda *, securities: calls["eq"].append(_ids(securities)) or {"points": 0},
+    )
+
+    def fake_refresh_navs(*, securities):
+        sec_ids = _ids(securities)
+        calls["refresh"].append(sec_ids)
+        assert other_sec.id not in sec_ids
+        NAVHistory.objects.create(security=owned, date=_BASELINE, nav=Decimal("42"))
+        return {"updated": 1, "skipped": 0, "errors": 0}
+
+    monkeypatch.setattr("folioman_app.api.navs.refresh_navs", fake_refresh_navs)
+    monkeypatch.setattr(
+        "folioman_app.api.navs.recompute_investor_valuation",
+        lambda investor_id, prime_navs=False: (
+            calls["recompute"].append((investor_id, prime_navs)) or "ready"
+        ),
+    )
+
+    body = client.post("/api/navs/refresh").json()
+
+    assert body["updated"] == 1
+    assert body["skipped"] == 0
+    assert body["errors"] == 0
+    assert [row["name"] for row in body["freshness"]["securities"]] == ["Owned Fund"]
+    assert body["freshness"]["securities"][0]["status"] == "fresh"
+    assert calls["mf"] == [[owned.id]]
+    assert calls["eq"] == [[]]
+    assert calls["refresh"] == [[owned.id]]
+    assert calls["recompute"] == [(inv.id, False)]

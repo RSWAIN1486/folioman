@@ -66,7 +66,7 @@ pg-down:
 # Fernet key here is the dev/test value (insecure, never production).
 test-app-pg:
 	DJANGO_SETTINGS_MODULE=folioman_app.settings.server \
-	FOLIOMAN_DB_HOST=127.0.0.1 FOLIOMAN_DB_PASSWORD=folioman \
+	DATABASE_URL=postgresql://folioman:folioman@127.0.0.1:5432/folioman \
 	FOLIOMAN_FERNET_KEY=$(DEV_FERNET_KEY) \
 	uv run --extra server pytest app/tests --ds=folioman_app.settings.server
 

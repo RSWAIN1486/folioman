@@ -136,6 +136,51 @@ def test_backfill_refills_short_tail_despite_fresh_head(monkeypatch, make_invest
     assert captured["since"] == dt.date(2018, 2, 26)  # re-pulled from the first trade
 
 
+def test_backfill_refills_missing_previous_trading_day_despite_fresh_head(
+    monkeypatch, make_investor
+):
+    """A series with today's latest NAV but a hole on the immediately previous
+    trading day must re-pull — 1D return uses that exact pair."""
+    from folioman_app.models import NAVHistory
+    from folioman_app.services.trading_calendar import last_trading_day
+
+    latest = last_trading_day(dt.date.today())
+    previous = last_trading_day(latest - dt.timedelta(days=1))
+    older = last_trading_day(previous - dt.timedelta(days=1))
+    inv = make_investor()
+    create_manual_transaction(
+        inv,
+        {
+            "security_type": "mf",
+            "name": "Fund",
+            "amfi_code": "122639",
+            "folio_number": "MF0001",
+            "date": older,
+            "transaction_type": "buy",
+            "units": Decimal("100"),
+            "price": Decimal("75"),
+        },
+    )
+    sec = Security.objects.get(amfi_code="122639")
+    NAVHistory.objects.create(security=sec, date=older, nav=Decimal("80"))
+    NAVHistory.objects.create(security=sec, date=latest, nav=Decimal("82"))
+
+    monkeypatch.setattr(
+        mfapi,
+        "fetch_nav_history",
+        lambda code, *, since=None, **_: _history(
+            (older.isoformat(), "80"),
+            (previous.isoformat(), "81"),
+            (latest.isoformat(), "82"),
+        ),
+    )
+
+    summary = backfill_missing_history()
+
+    assert summary["points"] == 1
+    assert NAVHistory.objects.filter(security=sec, date=previous).exists()
+
+
 def test_backfill_records_feed_errors(monkeypatch):
     def _boom(code, **_):
         raise mfapi.NAVFetchError("mfapi down")
@@ -208,6 +253,68 @@ def test_backfill_mf_short_lag_uses_one_amfi_range_report(monkeypatch, make_inve
     for code, nav in (("100001", "11"), ("100002", "22")):
         sec = Security.objects.get(amfi_code=code)
         row = NAVHistory.objects.get(security=sec, date=end)
+        assert row.nav == Decimal(nav)
+        assert row.source == "amfi"
+
+
+def test_backfill_mf_head_gap_uses_range_report_to_repair_previous_trading_day(
+    monkeypatch, make_investor
+):
+    """A fund with the latest NAV but a missing immediately previous trading day
+    should still be repaired through the MF bulk range report."""
+    from folioman_app.services.trading_calendar import last_trading_day
+    from folioman_app.tasks.refresh_navs import backfill_missing_history
+    from folioman_core.price_feeds import amfi_bulk, captnemo, mfapi
+
+    latest = last_trading_day(dt.date.today())
+    previous = last_trading_day(latest - dt.timedelta(days=1))
+    older = last_trading_day(previous - dt.timedelta(days=1))
+
+    def _forbidden(*_a, **_k):
+        raise AssertionError("per-scheme MF feed hit despite the AMFI range report")
+
+    monkeypatch.setattr(mfapi, "fetch_nav_history", _forbidden)
+    monkeypatch.setattr(captnemo, "fetch_nav_history", _forbidden)
+    monkeypatch.setattr(
+        amfi_bulk,
+        "fetch_range",
+        lambda frmdt, todt, **_: {
+            "100001": [
+                NAVPoint(date=previous, nav=Decimal("11")),
+                NAVPoint(date=latest, nav=Decimal("12")),
+            ],
+            "100002": [
+                NAVPoint(date=previous, nav=Decimal("21")),
+                NAVPoint(date=latest, nav=Decimal("22")),
+            ],
+        },
+    )
+
+    inv = make_investor()
+    for code, nav in (("100001", "12"), ("100002", "22")):
+        create_manual_transaction(
+            inv,
+            {
+                "security_type": "mf",
+                "name": f"Fund {code}",
+                "amfi_code": code,
+                "folio_number": f"MF{code}",
+                "date": older,
+                "transaction_type": "buy",
+                "units": Decimal("100"),
+                "price": Decimal("10"),
+            },
+        )
+        sec = Security.objects.get(amfi_code=code)
+        NAVHistory.objects.create(security=sec, date=older, nav=Decimal("10"))
+        NAVHistory.objects.create(security=sec, date=latest, nav=Decimal(nav))
+
+    summary = backfill_missing_history()
+
+    assert summary["securities"] == 2
+    for code, nav in (("100001", "11"), ("100002", "21")):
+        sec = Security.objects.get(amfi_code=code)
+        row = NAVHistory.objects.get(security=sec, date=previous)
         assert row.nav == Decimal(nav)
         assert row.source == "amfi"
 

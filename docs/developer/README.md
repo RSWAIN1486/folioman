@@ -106,12 +106,18 @@ so `make test` (core + app suites) needs no environment setup. For ad-hoc local
 | `FOLIOMAN_DEBUG` | both | `0` | `1` enables DEBUG (never in production) |
 | `FOLIOMAN_DATA_DIR` | desktop | per-OS user-data dir (platformdirs) | SQLite DB + rotating logs location |
 | `FOLIOMAN_ALLOWED_HOSTS` | server | (empty) | Comma-separated allowed hostnames |
-| `FOLIOMAN_DB_NAME` / `_USER` / `_PASSWORD` / `_HOST` / `_PORT` | server | `folioman` / `folioman` / (empty) / `127.0.0.1` / `5432` | Postgres connection |
+| `DATABASE_URL` | server | (none) | Postgres connection URL — required in server mode |
 | `FOLIOMAN_DB_CONN_MAX_AGE` | server | `60` | Persistent connection lifetime (seconds) |
 | `FOLIOMAN_LOG_DIR` | server | (console only) | If set, also write rotating file logs here |
 
 Server bind/worker variables (`FOLIOMAN_HOST`, `FOLIOMAN_WORKERS`, ...) are
 documented in [server.md](server.md).
+
+For repo-local source runs of `python -m folioman_server`, put `DATABASE_URL`,
+`FOLIOMAN_SECRET_KEY`, and `FOLIOMAN_FERNET_KEY` in a root `.env`; the command
+loads that automatically. `server/.env` is for Docker Compose only. Run
+`python -m folioman_server` and `python -m folioman_server run-scheduler` in
+separate terminals so server-mode valuations can finish computing.
 
 ## Authentication
 

@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import SelectButton from 'primevue/selectbutton'
 import { api, type Schemas } from '@/api/client'
+import { useUiStore } from '@/stores/ui'
 import { formatDate } from '@/utils/format'
 import { assetLabel } from '@/utils/portfolio'
 
 type FreshnessRow = Schemas['NavSecurityFreshnessOut']
+const props = withDefaults(defineProps<{ manualRefreshAllowed?: boolean }>(), {
+  manualRefreshAllowed: false,
+})
 
 const loading = ref(true)
+const refreshing = ref(false)
 const freshness = ref<Schemas['NavFreshnessOut'] | null>(null)
+const ui = useUiStore()
 
 async function load(): Promise<void> {
   const res = await api.GET('/api/navs/freshness')
@@ -35,6 +42,7 @@ const statusColor = (s: string) => STATUS_META[s]?.color ?? 'var(--fm-text-muted
 const rows = computed<FreshnessRow[]>(() => freshness.value?.securities ?? [])
 const total = computed(() => rows.value.length)
 const currentCount = computed(() => rows.value.filter((r) => r.status === 'fresh').length)
+const canManualRefresh = computed(() => props.manualRefreshAllowed && total.value > 0)
 
 // Status filter (like the Integrity page): All / needs-attention slices.
 const FILTERS = [
@@ -150,6 +158,49 @@ const lastRefreshText = computed(() => {
   const d = new Date(iso)
   return `${formatDate(iso)}, ${timeFmt.format(d)}`
 })
+
+async function refreshNow(): Promise<void> {
+  refreshing.value = true
+  try {
+    const res = await api.POST('/api/navs/refresh', {})
+    if (res.error || !res.data) throw new Error('refresh failed')
+    freshness.value = res.data.freshness
+    if (res.data.errors > 0) {
+      ui.notify({
+        severity: 'warn',
+        summary: 'Price refresh finished',
+        detail: `${res.data.updated} updated, ${res.data.errors} feed errors.`,
+      })
+      return
+    }
+    if (res.data.updated > 0) {
+      const skipped =
+        res.data.skipped > 0 ? ` ${res.data.skipped} unchanged or without a feed.` : ''
+      ui.notify({
+        severity: 'success',
+        summary: 'Prices refreshed',
+        detail: `${res.data.updated} securities updated.${skipped}`,
+      })
+      return
+    }
+    ui.notify({
+      severity: 'info',
+      summary: 'No new prices found',
+      detail:
+        res.data.skipped > 0
+          ? `${res.data.skipped} securities were unchanged or have no live feed.`
+          : 'Your tracked prices were already current.',
+    })
+  } catch {
+    ui.notify({
+      severity: 'error',
+      summary: 'Refresh failed',
+      detail: 'Could not fetch the latest prices right now.',
+    })
+  } finally {
+    refreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -187,14 +238,26 @@ const lastRefreshText = computed(() => {
         </ul>
       </div>
 
-      <!-- Refresh schedule: prices update themselves; no user trigger -->
-      <p class="schedule" role="status">
-        <i class="pi pi-clock" />
-        <span>
-          Prices refresh automatically every 6 hours — next run
-          <strong>{{ nextRefreshText }}</strong> · last updated {{ lastRefreshText }}.
-        </span>
-      </p>
+      <div class="schedule">
+        <p class="schedule-copy" role="status">
+          <i class="pi pi-clock" />
+          <span>
+            Prices refresh automatically every 6 hours — next run
+            <strong>{{ nextRefreshText }}</strong> · last updated {{ lastRefreshText }}.
+          </span>
+        </p>
+        <Button
+          v-if="canManualRefresh"
+          label="Refresh now"
+          icon="pi pi-refresh"
+          size="small"
+          severity="secondary"
+          outlined
+          :loading="refreshing"
+          :disabled="refreshing"
+          @click="refreshNow"
+        />
+      </div>
 
       <div class="toolbar">
         <SelectButton
@@ -351,15 +414,22 @@ const lastRefreshText = computed(() => {
 /* Schedule note */
 .schedule {
   display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin: 0;
   padding: 0.6rem 0.8rem;
-  font-size: 0.8125rem;
-  color: var(--fm-text-muted);
   background: var(--fm-surface-raised);
   border: 1px solid var(--fm-border-subtle);
   border-radius: var(--fm-radius-sm);
+}
+.schedule-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--fm-text-muted);
 }
 .schedule strong {
   color: var(--fm-text);
@@ -501,6 +571,10 @@ const lastRefreshText = computed(() => {
 }
 
 @media (max-width: 720px) {
+  .schedule {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .row {
     grid-template-columns: 1fr auto;
   }

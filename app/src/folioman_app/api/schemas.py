@@ -359,16 +359,21 @@ class NavSecurityFreshnessOut(Schema):
 
 
 class NavFreshnessOut(Schema):
-    """Settings 'NAV freshness' panel: per-security currency + refresh schedule.
-
-    Read-only — refreshes run on the scheduler (or ``manage.py refresh_navs``);
-    the panel shows when prices were last written and when the next pass runs.
-    """
+    """Settings 'NAV freshness' panel: per-security currency + refresh schedule."""
 
     as_of: date  # the last *completed* trading day lags are measured against
     securities: list[NavSecurityFreshnessOut]
     last_refreshed_at: datetime | None = None  # newest NAVHistory write (any source)
     next_refresh_at: datetime  # next scheduled re-fetch pass (absolute instant)
+
+
+class NavRefreshOut(Schema):
+    """Advisor-scoped manual NAV refresh: latest prices plus the refreshed panel."""
+
+    updated: int
+    skipped: int
+    errors: int
+    freshness: NavFreshnessOut
 
 
 class TransactionIn(Schema):

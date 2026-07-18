@@ -892,6 +892,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/navs/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Navs Now
+         * @description Refresh the caller's tracked prices now, then recompute their values.
+         */
+        post: operations["folioman_app_api_navs_refresh_navs_now"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup/admin": {
         parameters: {
             query?: never;
@@ -1039,7 +1059,7 @@ export interface components {
         CapitalGainsOut: {
             /**
              * Disclaimer
-             * @default Quick heads up: This is just a draft to help you and your tax pro get started. It's not tax advice or a filing. The numbers are based on what you’ve imported; they might be off if something was missing or misread. Always double-check before you file! No warranty—use at your own risk.
+             * @default Quick heads up: This is just a draft to help you and your tax pro get started. It's not tax advice or a filing. The numbers are based on what you've imported; they might be off if something was missing or misread. Always double-check before you file! No warranty—use at your own risk.
              */
             disclaimer: string;
             /** Fy */
@@ -1698,9 +1718,6 @@ export interface components {
         /**
          * NavFreshnessOut
          * @description Settings 'NAV freshness' panel: per-security currency + refresh schedule.
-         *
-         *     Read-only — refreshes run on the scheduler (or ``manage.py refresh_navs``);
-         *     the panel shows when prices were last written and when the next pass runs.
          */
         NavFreshnessOut: {
             /**
@@ -1727,6 +1744,19 @@ export interface components {
             date: string;
             /** Nav */
             nav: string;
+        };
+        /**
+         * NavRefreshOut
+         * @description Advisor-scoped manual NAV refresh: latest prices plus the refreshed panel.
+         */
+        NavRefreshOut: {
+            /** Errors */
+            errors: number;
+            freshness: components["schemas"]["NavFreshnessOut"];
+            /** Skipped */
+            skipped: number;
+            /** Updated */
+            updated: number;
         };
         /**
          * NavSecurityFreshnessOut
@@ -1893,7 +1923,7 @@ export interface components {
             columns: string[];
             /**
              * Disclaimer
-             * @default Quick heads up: This is just a draft to help you and your tax pro get started. It's not tax advice or a filing. The numbers are based on what you’ve imported; they might be off if something was missing or misread. Always double-check before you file! No warranty—use at your own risk.
+             * @default Quick heads up: This is just a draft to help you and your tax pro get started. It's not tax advice or a filing. The numbers are based on what you've imported; they might be off if something was missing or misread. Always double-check before you file! No warranty—use at your own risk.
              */
             disclaimer: string;
             /** Fy */
@@ -3546,6 +3576,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NavFreshnessOut"];
+                };
+            };
+        };
+    };
+    folioman_app_api_navs_refresh_navs_now: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavRefreshOut"];
                 };
             };
         };

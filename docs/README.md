@@ -11,6 +11,7 @@
 
 ## For developers & operators
 
+- [`progress.md`](progress.md) — minimal project status, decisions, and blockers.
 - [`developer/`](developer/README.md) — setup, run modes, configuration, auth,
   the API contract, and secrets.
 - [`developer/tradebook-import.md`](developer/tradebook-import.md) — canonical CSV

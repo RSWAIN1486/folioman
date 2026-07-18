@@ -448,7 +448,9 @@ def _backfill_candidate(security: Security, cutoff: date_cls, force: bool):
     the stored series already extends to that span start (so the only gap is a recent
     head lag — the bulk paths' favourable case). Skips only when the series is current
     at the head AND reaches back; a head-only check let a shallow series look "fresh"
-    forever, leaving a freshly imported holding's first trade unpriced.
+    forever, leaving a freshly imported holding's first trade unpriced. It also keeps
+    backfilling when the latest point exists but its immediately previous trading day
+    is missing, because dashboard 1-day return depends on that exact pair.
     """
     txn_first = Transaction.objects.filter(security=security).aggregate(d=Min("date"))["d"]
     hold_first = Holding.objects.filter(security=security).aggregate(d=Min("as_of_date"))["d"]
@@ -457,12 +459,38 @@ def _backfill_candidate(security: Security, cutoff: date_cls, force: bool):
     bounds = NAVHistory.objects.filter(security=security).aggregate(lo=Min("date"), hi=Max("date"))
     latest, earliest = bounds["hi"], bounds["lo"]
     behind = trading_days_between(latest, cutoff) if latest is not None else None
+    head_gap = _head_gap_start(security, cutoff) is not None
     reaches_back = since is None or (
         earliest is not None and earliest <= since + _BACKFILL_TAIL_GRACE
     )
-    if not force and behind is not None and behind <= _HISTORY_FRESH_TRADING_DAYS and reaches_back:
+    if (
+        not force
+        and behind is not None
+        and behind <= _HISTORY_FRESH_TRADING_DAYS
+        and reaches_back
+        and not head_gap
+    ):
         return None
     return since, latest, reaches_back
+
+
+def _head_gap_start(security: Security, cutoff: date_cls) -> date_cls | None:
+    """Earliest date that needs a recent-gap repair, or ``None`` when the head is
+    contiguous.
+
+    The dashboard's 1-day return uses the latest NAV and the immediately previous
+    trading day. If that predecessor is missing, a series can look fresh at the
+    head while still producing the wrong delta. Returning the day after the older
+    stored point lets the bulk catch-up paths fetch just the narrow repair window.
+    """
+    tail = list(
+        NAVHistory.objects.filter(security=security, date__lte=cutoff)
+        .order_by("-date")
+        .values_list("date", flat=True)[:2]
+    )
+    if len(tail) < 2 or trading_days_between(tail[1], tail[0]) <= 1:
+        return None
+    return tail[1] + timedelta(days=1)
 
 
 def _run_backfill_one(security, since, latest, backfill_one, summary) -> None:
@@ -597,12 +625,14 @@ def _bulk_backfill_mf(needing: list[tuple], cutoff: date_cls, summary: dict) -> 
     for security, _since, latest, reaches_back in needing:
         if security.security_type != SecurityType.MF.value or latest is None or not reaches_back:
             continue  # fresh / deep hole → per-scheme (one call serves its full history)
-        if 0 < trading_days_between(latest, cutoff) <= _MF_BULK_MAX_LAG:
-            eligible.append((security, latest))
+        repair_from = _head_gap_start(security, cutoff)
+        lag = trading_days_between(latest, cutoff)
+        if repair_from is not None or 0 < lag <= _MF_BULK_MAX_LAG:
+            eligible.append((security, repair_from or (latest + timedelta(days=1))))
     if len(eligible) < 2:
         return set()
 
-    start = min(latest for _, latest in eligible) + timedelta(days=1)
+    start = min(start for _, start in eligible)
     logger.info(
         "MF backfill: %d funds lag ≤%d trading days → one AMFI range report "
         "(cheaper than per-scheme)",
@@ -618,14 +648,14 @@ def _bulk_backfill_mf(needing: list[tuple], cutoff: date_cls, summary: dict) -> 
     handled: set[int] = set()
     written_ids: set[int] = set()
     to_create: list[NAVHistory] = []
-    for security, latest in eligible:
+    for security, start_from in eligible:
         points = history.get(security.amfi_code) or history.get(security.isin)
         if points is None:
             continue  # not in the report → leave it for the per-scheme feed
         handled.add(security.id)
         existing = set(NAVHistory.objects.filter(security=security).values_list("date", flat=True))
         for p in points:
-            if latest < p.date <= cutoff and p.date not in existing:
+            if start_from <= p.date <= cutoff and p.date not in existing:
                 to_create.append(
                     NAVHistory(security=security, date=p.date, nav=p.nav, source="amfi")
                 )

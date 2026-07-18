@@ -1821,7 +1821,7 @@
         "type": "object"
       },
       "NavFreshnessOut": {
-        "description": "Settings 'NAV freshness' panel: per-security currency + refresh schedule.\n\nRead-only \u2014 refreshes run on the scheduler (or ``manage.py refresh_navs``);\nthe panel shows when prices were last written and when the next pass runs.",
+        "description": "Settings 'NAV freshness' panel: per-security currency + refresh schedule.",
         "properties": {
           "as_of": {
             "format": "date",
@@ -1879,6 +1879,34 @@
           "nav"
         ],
         "title": "NavPoint",
+        "type": "object"
+      },
+      "NavRefreshOut": {
+        "description": "Advisor-scoped manual NAV refresh: latest prices plus the refreshed panel.",
+        "properties": {
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/NavFreshnessOut"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated",
+          "skipped",
+          "errors",
+          "freshness"
+        ],
+        "title": "NavRefreshOut",
         "type": "object"
       },
       "NavSecurityFreshnessOut": {
@@ -5526,6 +5554,29 @@
           }
         },
         "summary": "Nav Freshness",
+        "tags": [
+          "navs"
+        ]
+      }
+    },
+    "/api/navs/refresh": {
+      "post": {
+        "description": "Refresh the caller's tracked prices now, then recompute their values.",
+        "operationId": "folioman_app_api_navs_refresh_navs_now",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavRefreshOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Refresh Navs Now",
         "tags": [
           "navs"
         ]

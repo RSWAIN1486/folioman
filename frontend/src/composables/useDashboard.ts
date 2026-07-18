@@ -155,6 +155,7 @@ export function useDashboard(investorId: Ref<number>) {
   const series = ref<Schemas['ValueSeriesPoint'][]>([])
   const range = ref<RangeKey>('1Y')
   const loading = ref(false)
+  const refreshingPrices = ref(false)
   // Day-wise valuation readiness — gates the net-worth chart (the headline numbers
   // stay ungated, backed by the provisional value until the worker finishes).
   const valuationStatus = ref<string>('ready')
@@ -239,6 +240,53 @@ export function useDashboard(investorId: Ref<number>) {
       loading.value = false
     }
     if (!valuationReady.value) startPolling()
+  }
+
+  async function refreshPrices(): Promise<boolean> {
+    refreshingPrices.value = true
+    const wasWaiting = !valuationReady.value
+    stopPolling()
+    try {
+      const res = await api.POST('/api/navs/refresh', {})
+      if (res.error || !res.data) throw new Error('refresh failed')
+      await Promise.all([loadSummary(), loadSeries(), loadStatus()])
+      if (!valuationReady.value) startPolling()
+      if (res.data.errors > 0) {
+        ui.notify({
+          severity: 'warn',
+          summary: 'Price refresh finished',
+          detail: `${res.data.updated} updated, ${res.data.errors} feed errors.`,
+        })
+      } else if (res.data.updated > 0) {
+        const skipped =
+          res.data.skipped > 0 ? ` ${res.data.skipped} unchanged or without a feed.` : ''
+        ui.notify({
+          severity: 'success',
+          summary: 'Prices refreshed',
+          detail: `${res.data.updated} securities updated.${skipped}`,
+        })
+      } else {
+        ui.notify({
+          severity: 'info',
+          summary: 'No new prices found',
+          detail:
+            res.data.skipped > 0
+              ? `${res.data.skipped} securities were unchanged or have no live feed.`
+              : 'Your tracked prices were already current.',
+        })
+      }
+      return true
+    } catch {
+      ui.notify({
+        severity: 'error',
+        summary: 'Refresh failed',
+        detail: 'Could not fetch the latest prices right now.',
+      })
+      if (wasWaiting) startPolling()
+      return false
+    } finally {
+      refreshingPrices.value = false
+    }
   }
 
   // Range is now a client-side zoom window over the already-fetched full series —
@@ -416,10 +464,12 @@ export function useDashboard(investorId: Ref<number>) {
     summary,
     rollup,
     loading,
+    refreshingPrices,
     range,
     setRange,
     valueWindow,
     reload: loadAll,
+    refreshPrices,
     valuationReady,
     valuationStatus,
   }

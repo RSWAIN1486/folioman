@@ -57,8 +57,10 @@ runs `<binary> refresh-navs`, which backfills any gaps then refreshes the latest
 point against the same user-data DB.
 
 This is optional: while the app is open it already refreshes NAVs itself (every
-6 hours), and opening the app catches up stale prices in the background. Run the
-schedule only if you want prices kept current while the app is closed — and
+6 hours), opening the app catches up stale prices in the background, and the
+Dashboard header / Settings → NAV freshness panel can force a refresh
+immediately for the local book. Run the schedule only if you want prices kept
+current while the app is closed — and
 **run `--uninstall` before deleting the app**, otherwise the OS job is left behind
 pointing at a missing binary (harmless, but orphaned). There's no auto-cleanup on
 uninstall — dragging an app to the Trash runs no hook on any OS.

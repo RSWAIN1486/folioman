@@ -2,9 +2,9 @@
 
 Answers "how current are my prices?" per security: the latest stored NAV date,
 how many trading days it lags the last *completed* trading day, and the stored
-history range. Read-only — refreshes run on the scheduler (every 6 hours, see
+history range. Refreshes still run on the scheduler (every 6 hours, see
 ``tasks.valuation_ticks.REVALUE_HOURS``) or via ``manage.py refresh_navs``; the
-panel shows the schedule instead of offering a trigger.
+panel reads this same snapshot before and after any user-triggered refresh.
 
 The baseline is the previous trading day, not today: a NAV/close for trading
 day T publishes after T ends (MF NAVs late evening to next morning), so on a
