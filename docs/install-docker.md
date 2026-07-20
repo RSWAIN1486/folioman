@@ -5,6 +5,10 @@ Postgres — on your own machine or VPS. This is the path for hosting Folioman f
 yourself or a team; if you just want a local app on one computer, the
 [desktop app](../BUILD.md) is simpler (no server, no Postgres, no login).
 
+If what you want is specifically the **web UI on your own machine**, this is also
+the shortest verified launch path: start Docker Desktop, bring up
+`server/docker-compose.yml`, then open `http://127.0.0.1:8000/setup`.
+
 > v1 ships **unsigned and ungated** — every feature is available, there are no
 > paid tiers. Your data stays on your server; nothing phones home.
 
@@ -64,6 +68,8 @@ Then set:
 ## 3. Start the stack
 
 ```bash
+# macOS: start Docker Desktop first
+open -a Docker
 docker compose -f server/docker-compose.yml up -d --build
 ```
 
@@ -73,6 +79,12 @@ migrations, and serves. Check it's healthy:
 ```bash
 docker compose -f server/docker-compose.yml ps          # all services "healthy"/"Up"
 curl localhost:8000/api/health                          # {"status":"ok","database":"ok"}
+```
+
+For a purely local launch, open:
+
+```txt
+http://127.0.0.1:8000/setup
 ```
 
 ## 4. Create the first login

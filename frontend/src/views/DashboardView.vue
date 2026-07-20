@@ -2,16 +2,17 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
+import Select from 'primevue/select'
 import IntegrityHealthCard from '@/components/IntegrityHealthCard.vue'
 import DeltaChip from '@/components/DeltaChip.vue'
 import AssetClassSummary from '@/views/dashboard/AssetClassSummary.vue'
-import { useDashboard, type RangeKey } from '@/composables/useDashboard'
+import { useDashboard, type RangeKey, type ReturnWindowKey } from '@/composables/useDashboard'
 import { RANGES } from '@/utils/portfolio'
 import { useCountUp } from '@/composables/useCountUp'
 import { useMetaStore } from '@/stores/meta'
 import { useRosterStore } from '@/stores/roster'
 import { useUiStore } from '@/stores/ui'
-import { formatInr, formatInrCompact } from '@/utils/format'
+import { formatInr, formatInrCompact, formatPercent } from '@/utils/format'
 
 const AllocationDonut = defineAsyncComponent(
   () => import('@/components/charts/AllocationDonut.vue'),
@@ -60,9 +61,24 @@ const investorName = computed(() => roster.investorName(investorId.value) ?? 'In
 
 // Live summary + the full net-worth series (fetched once); the range toggle just
 // windows it client-side via `valueWindow`, and the chart's slider can free-zoom.
-const { summary, rollup, range, setRange, valueWindow, valuationReady, loading, refreshingPrices, refreshPrices } =
+const {
+  summary,
+  rollup,
+  range,
+  returnWindow,
+  returnWindowOptions,
+  selectedReturn,
+  setRange,
+  setReturnWindow,
+  valueWindow,
+  valuationReady,
+  loading,
+  refreshingPrices,
+  refreshPrices,
+} =
   useDashboard(investorId)
 const showRefreshButton = computed(() => meta.loaded && !meta.readOnly)
+const returnCardClass = computed(() => selectedReturn.value?.direction ?? 'flat')
 
 // Axis tick density follows the active range's sampling (see RANGES).
 const valueGranularity = computed(() => RANGES[range.value].granularity)
@@ -130,6 +146,11 @@ const allocationGroup = ref<AllocationGroup>('asset')
 const allocationData = computed(() =>
   allocationGroup.value === 'asset' ? summary.value.allocation : summary.value.allocationByCategory,
 )
+
+function formatSignedInr(value: number): string {
+  const body = formatInr(Math.abs(value))
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${body}`
+}
 </script>
 
 <template>
@@ -254,16 +275,24 @@ const allocationData = computed(() =>
         />
         <span v-else class="kpi-na">Needs more history</span>
       </div>
-      <div class="stat">
-        <span class="eyebrow">1D return</span>
-        <DeltaChip
-          v-if="summary.dayChangeAmount !== null"
-          :amount="summary.dayChangeAmount"
-          :percent="summary.dayChangePercent ?? undefined"
-          size="sm"
-          compact
+      <div class="stat stat-return">
+        <Select
+          class="return-window"
+          :model-value="returnWindow"
+          :options="returnWindowOptions"
+          option-label="label"
+          option-value="value"
+          size="small"
+          @update:model-value="(v: ReturnWindowKey | null) => v && setReturnWindow(v)"
         />
-        <span v-else class="muted">—</span>
+        <div v-if="selectedReturn" class="window-return" :class="returnCardClass">
+          <span class="window-return-amount">{{ formatSignedInr(selectedReturn.amount) }}</span>
+          <span v-if="selectedReturn.annualizedPercent !== null" class="window-return-rate">
+            {{ formatPercent(selectedReturn.annualizedPercent) }} p.a.
+          </span>
+          <span v-else class="window-return-rate muted">p.a. unavailable</span>
+        </div>
+        <span v-else class="kpi-na">Needs more history</span>
       </div>
       <div class="stat">
         <span class="eyebrow">Holdings</span>
@@ -446,6 +475,36 @@ const allocationData = computed(() =>
 .stat:first-child {
   padding-left: 0;
   border-left: none;
+}
+.stat-return {
+  gap: 0.55rem;
+}
+.return-window {
+  width: min(100%, 11rem);
+}
+.window-return {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.window-return-amount {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.window-return-rate {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.window-return.gain {
+  color: var(--fm-gain);
+}
+.window-return.loss {
+  color: var(--fm-loss);
+}
+.window-return.flat {
+  color: var(--fm-text-subtle);
 }
 .kpi-val {
   font-size: 1.25rem;

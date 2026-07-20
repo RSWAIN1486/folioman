@@ -73,7 +73,27 @@ const SUMMARY = {
 const SERIES = [
   { date: '2025-01-01', value_inr: '0', invested_inr: '0', stale: false },
   { date: '2025-02-01', value_inr: '1200', invested_inr: '1000', stale: false },
+  { date: '2025-03-01', value_inr: '3000', invested_inr: '1500', stale: false },
   { date: '2025-06-01', value_inr: '7500', invested_inr: '1000', stale: false },
+]
+const TXNS = [
+  {
+    id: 1,
+    investor_id: 1,
+    security_id: 1,
+    folio_id: 1,
+    date: '2025-04-15',
+    transaction_type: 'buy',
+    units: '10',
+    nav_or_price: '100',
+    amount: '1000',
+    fees: '0',
+    stamp_duty: '0',
+    brokerage: '0',
+    currency: 'INR',
+    source: 'manual',
+    narration: '',
+  },
 ]
 const INTEGRITY = [
   {
@@ -91,6 +111,7 @@ const INTEGRITY = [
 function routeGet(path: string) {
   if (path.endsWith('/summary')) return Promise.resolve({ data: SUMMARY })
   if (path.endsWith('/value-series')) return Promise.resolve({ data: { points: SERIES } })
+  if (path.endsWith('/transactions')) return Promise.resolve({ data: TXNS })
   if (path.endsWith('/integrity')) return Promise.resolve({ data: INTEGRITY })
   return Promise.resolve({ data: null })
 }
@@ -130,7 +151,7 @@ describe('useDashboard', () => {
     await flush()
     await flush()
 
-    expect(summary.value.valueSeries).toHaveLength(2)
+    expect(summary.value.valueSeries).toHaveLength(3)
     expect(summary.value.valueSeries[0].date).toBe('2025-02-01')
   })
 
@@ -254,5 +275,31 @@ describe('useDashboard', () => {
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ severity: 'success', summary: 'Prices refreshed' }),
     )
+  })
+
+  it('computes selected return windows from the value series plus in-window cashflows', async () => {
+    const { selectedReturn, setReturnWindow } = useDashboard(ref(1))
+    await flush()
+    await flush()
+
+    setReturnWindow('3M')
+    await flush()
+
+    expect(selectedReturn.value?.amount).toBeCloseTo(3500)
+    expect(selectedReturn.value?.annualizedPercent).not.toBeNull()
+    expect(selectedReturn.value?.direction).toBe('gain')
+  })
+
+  it('reuses the headline all-time return and xirr for the all-time window', async () => {
+    const { selectedReturn, setReturnWindow } = useDashboard(ref(1))
+    await flush()
+    await flush()
+
+    setReturnWindow('All')
+    await flush()
+
+    expect(selectedReturn.value?.amount).toBe(6500)
+    expect(selectedReturn.value?.annualizedPercent).toBeCloseTo(18.49)
+    expect(selectedReturn.value?.isAllTime).toBe(true)
   })
 })

@@ -23,6 +23,213 @@ import {
 
 export type { RangeKey }
 
+export type ReturnWindowKey =
+  | '1D'
+  | '1W'
+  | '1M'
+  | '3M'
+  | '6M'
+  | '1Y'
+  | '3Y'
+  | '5Y'
+  | '7Y'
+  | '10Y'
+  | 'All'
+
+export interface ReturnWindowOption {
+  label: string
+  value: ReturnWindowKey
+}
+
+export interface PeriodReturn {
+  amount: number
+  annualizedPercent: number | null
+  fromDate: string
+  toDate: string
+  direction: 'gain' | 'loss' | 'flat'
+  isAllTime: boolean
+}
+
+const RETURN_WINDOW_OPTIONS: ReturnWindowOption[] = [
+  { label: '1 day', value: '1D' },
+  { label: '1 week', value: '1W' },
+  { label: '1 month', value: '1M' },
+  { label: '3 months', value: '3M' },
+  { label: '6 months', value: '6M' },
+  { label: '1 year', value: '1Y' },
+  { label: '3 years', value: '3Y' },
+  { label: '5 years', value: '5Y' },
+  { label: '7 years', value: '7Y' },
+  { label: '10 years', value: '10Y' },
+  { label: 'All time', value: 'All' },
+]
+
+type ValuePointWithIso = ValuePoint
+type DashboardTransaction = Schemas['TransactionOut']
+type SignedFlow = { date: string; amount: number }
+
+const _CASH_IN_TYPES = new Set(['buy', 'transfer_in'])
+const _CASH_OUT_TYPES = new Set(['sell', 'transfer_out', 'dividend'])
+
+function _parseIsoDate(iso: string): Date {
+  const [year, month, day] = iso.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+function _toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+function _addDays(iso: string, days: number): string {
+  const d = _parseIsoDate(iso)
+  d.setUTCDate(d.getUTCDate() + days)
+  return _toIsoDate(d)
+}
+
+function _addMonths(iso: string, months: number): string {
+  const d = _parseIsoDate(iso)
+  const year = d.getUTCFullYear()
+  const month = d.getUTCMonth()
+  const day = d.getUTCDate()
+  const targetMonth = month + months
+  const firstOfTarget = new Date(Date.UTC(year, targetMonth, 1))
+  const lastDay = new Date(Date.UTC(firstOfTarget.getUTCFullYear(), firstOfTarget.getUTCMonth() + 1, 0))
+  firstOfTarget.setUTCDate(Math.min(day, lastDay.getUTCDate()))
+  return _toIsoDate(firstOfTarget)
+}
+
+function _addYears(iso: string, years: number): string {
+  return _addMonths(iso, years * 12)
+}
+
+function _daysBetween(startIso: string, endIso: string): number {
+  return Math.round((_parseIsoDate(endIso).getTime() - _parseIsoDate(startIso).getTime()) / 86400000)
+}
+
+function _shiftReturnWindow(endIso: string, window: ReturnWindowKey): string {
+  switch (window) {
+    case '1D':
+      return _addDays(endIso, -1)
+    case '1W':
+      return _addDays(endIso, -7)
+    case '1M':
+      return _addMonths(endIso, -1)
+    case '3M':
+      return _addMonths(endIso, -3)
+    case '6M':
+      return _addMonths(endIso, -6)
+    case '1Y':
+      return _addYears(endIso, -1)
+    case '3Y':
+      return _addYears(endIso, -3)
+    case '5Y':
+      return _addYears(endIso, -5)
+    case '7Y':
+      return _addYears(endIso, -7)
+    case '10Y':
+      return _addYears(endIso, -10)
+    case 'All':
+      return endIso
+  }
+}
+
+function _transactionCash(txn: DashboardTransaction): number {
+  return txn.amount == null ? num(txn.units) * num(txn.nav_or_price) : num(txn.amount)
+}
+
+function _signedFlows(transactions: DashboardTransaction[], fromDate: string, toDate: string): SignedFlow[] {
+  return transactions
+    .filter((txn) => txn.date > fromDate && txn.date <= toDate)
+    .flatMap<SignedFlow>((txn) => {
+      const cash = _transactionCash(txn)
+      if (_CASH_IN_TYPES.has(txn.transaction_type)) return [{ date: txn.date, amount: cash }]
+      if (_CASH_OUT_TYPES.has(txn.transaction_type) && cash) return [{ date: txn.date, amount: -cash }]
+      return []
+    })
+}
+
+type CashFlow = { date: string; amount: number }
+
+function _yearFraction(startIso: string, endIso: string): number {
+  return _daysBetween(startIso, endIso) / 365
+}
+
+function _npv(rate: number, flows: CashFlow[]): number {
+  const startIso = flows[0]?.date
+  if (!startIso) return 0
+  return flows.reduce(
+    (sum, flow) => sum + flow.amount / (1 + rate) ** _yearFraction(startIso, flow.date),
+    0,
+  )
+}
+
+function _npvDerivative(rate: number, flows: CashFlow[]): number {
+  const startIso = flows[0]?.date
+  if (!startIso) return 0
+  return flows.reduce((sum, flow) => {
+    const years = _yearFraction(startIso, flow.date)
+    return sum + (-years * flow.amount) / (1 + rate) ** (years + 1)
+  }, 0)
+}
+
+function _bisectXirr(flows: CashFlow[], tolerance: number, low = -0.999999, high = 100): number | null {
+  let fLow = _npv(low, flows)
+  let fHigh = _npv(high, flows)
+  if ((fLow > 0) === (fHigh > 0)) return null
+  for (let i = 0; i < 200; i += 1) {
+    const mid = (low + high) / 2
+    const fMid = _npv(mid, flows)
+    if (Math.abs(fMid) < tolerance || (high - low) / 2 < tolerance) return mid
+    if ((fMid > 0) === (fLow > 0)) {
+      low = mid
+      fLow = fMid
+    } else {
+      high = mid
+      fHigh = fMid
+    }
+  }
+  return (low + high) / 2
+}
+
+function _computeXirr(flows: CashFlow[]): number | null {
+  if (flows.length < 2) return null
+  const dated = [...flows].sort((a, b) => a.date.localeCompare(b.date))
+  const hasInflow = dated.some((flow) => flow.amount > 0)
+  const hasOutflow = dated.some((flow) => flow.amount < 0)
+  if (!hasInflow || !hasOutflow) return null
+  const tolerance = 1e-7
+  let rate = 0.1
+  for (let i = 0; i < 100; i += 1) {
+    const npv = _npv(rate, dated)
+    if (Math.abs(npv) < tolerance) return rate
+    const derivative = _npvDerivative(rate, dated)
+    if (Math.abs(derivative) < tolerance) break
+    let nextRate = rate - npv / derivative
+    if (nextRate <= -0.999999) nextRate = -0.999999
+    if (Math.abs(nextRate - rate) < tolerance) return nextRate
+    rate = nextRate
+  }
+  return _bisectXirr(dated, tolerance)
+}
+
+function _cashflowsFromTransactions(
+  flows: SignedFlow[],
+  presentDate: string,
+  presentValue: number,
+): CashFlow[] {
+  const byDate = new Map<string, number>()
+  for (const flow of [...flows].sort((a, b) => a.date.localeCompare(b.date))) {
+    byDate.set(flow.date, (byDate.get(flow.date) ?? 0) + flow.amount)
+  }
+  const cashflows = [...byDate.entries()].map(([date, amount]) => ({ date, amount: -amount }))
+  cashflows.push({ date: presentDate, amount: presentValue })
+  return cashflows
+}
+
+function _direction(value: number): 'gain' | 'loss' | 'flat' {
+  return value > 0 ? 'gain' : value < 0 ? 'loss' : 'flat'
+}
+
 export interface HoldingRow {
   securityId: number
   name: string
@@ -153,7 +360,10 @@ function toSlices(
 export function useDashboard(investorId: Ref<number>) {
   const summaryData = ref<Schemas['InvestorSummaryOut'] | null>(null)
   const series = ref<Schemas['ValueSeriesPoint'][]>([])
+  const transactions = ref<DashboardTransaction[]>([])
+  const transactionsLoaded = ref(false)
   const range = ref<RangeKey>('1Y')
+  const returnWindow = ref<ReturnWindowKey>('1D')
   const loading = ref(false)
   const refreshingPrices = ref(false)
   // Day-wise valuation readiness — gates the net-worth chart (the headline numbers
@@ -192,6 +402,15 @@ export function useDashboard(investorId: Ref<number>) {
       },
     })
     series.value = data?.points ?? []
+  }
+
+  async function loadTransactions(): Promise<void> {
+    transactionsLoaded.value = false
+    const { data } = await api.GET('/api/investors/{investor_id}/transactions', {
+      params: { path: { investor_id: investorId.value } },
+    })
+    transactions.value = data ?? []
+    transactionsLoaded.value = !!data
   }
 
   async function loadStatus(): Promise<void> {
@@ -233,6 +452,7 @@ export function useDashboard(investorId: Ref<number>) {
       await Promise.all([
         loadSummary(),
         loadSeries(),
+        loadTransactions(),
         loadStatus(),
         integrityStore.load(investorId.value),
       ])
@@ -295,6 +515,10 @@ export function useDashboard(investorId: Ref<number>) {
     range.value = next
   }
 
+  function setReturnWindow(next: ReturnWindowKey): void {
+    returnWindow.value = next
+  }
+
   // The [from, to] the chart should zoom to for the active preset; null = full
   // range (All), i.e. show everything with no window.
   const valueWindow = computed(() =>
@@ -307,14 +531,68 @@ export function useDashboard(investorId: Ref<number>) {
   if (getCurrentScope()) onScopeDispose(stopPolling)
 
   // The net-worth line; trim the leading all-zero stretch before the first holding.
-  const valueSeries = computed<ValuePoint[]>(() => {
-    const points = series.value.map((p) => ({
+  const fullValueSeries = computed<ValuePointWithIso[]>(() =>
+    series.value.map((p) => ({
       date: p.date,
       current: num(p.value_inr),
       invested: num(p.invested_inr),
-    }))
+    })),
+  )
+
+  const valueSeries = computed<ValuePoint[]>(() => {
+    const points = fullValueSeries.value
     const firstReal = points.findIndex((p) => p.current !== 0 || p.invested !== 0)
     return firstReal > 0 ? points.slice(firstReal) : points
+  })
+
+  const allTimeReturn = computed<PeriodReturn | null>(() => {
+    const s = summaryData.value
+    const latest = fullValueSeries.value.at(-1)
+    if (!s || !latest) return null
+    const invested = latest.invested
+    const amount = num(s.total_inr) - invested
+    return {
+      amount,
+      annualizedPercent: s.xirr == null ? null : s.xirr * 100,
+      fromDate: fullValueSeries.value[0]?.date ?? latest.date,
+      toDate: latest.date,
+      direction: _direction(amount),
+      isAllTime: true,
+    }
+  })
+
+  const selectedReturn = computed<PeriodReturn | null>(() => {
+    const latest = fullValueSeries.value.at(-1)
+    if (!latest) return null
+    if (returnWindow.value === 'All') return allTimeReturn.value
+    if (!transactionsLoaded.value) return null
+
+    const targetStart = _shiftReturnWindow(latest.date, returnWindow.value)
+    const earliest = fullValueSeries.value[0]
+    if (!earliest) return null
+    if (targetStart < earliest.date) return allTimeReturn.value
+
+    const start = [...fullValueSeries.value].reverse().find((point) => point.date <= targetStart)
+    if (!start || start.date >= latest.date) return null
+
+    const flows = _signedFlows(transactions.value, start.date, latest.date)
+    const netInvested = flows.reduce((sum, flow) => sum + flow.amount, 0)
+    const amount = latest.current - start.current - netInvested
+    const annualizedRate = _computeXirr(
+      _cashflowsFromTransactions(
+        start.current > 0 ? [{ date: start.date, amount: start.current }, ...flows] : flows,
+        latest.date,
+        latest.current,
+      ),
+    )
+    return {
+      amount,
+      annualizedPercent: annualizedRate == null ? null : annualizedRate * 100,
+      fromDate: start.date,
+      toDate: latest.date,
+      direction: _direction(amount),
+      isAllTime: false,
+    }
   })
 
   const summary = computed<DashboardSummary>(() => {
@@ -466,7 +744,11 @@ export function useDashboard(investorId: Ref<number>) {
     loading,
     refreshingPrices,
     range,
+    returnWindow,
+    returnWindowOptions: RETURN_WINDOW_OPTIONS,
+    selectedReturn,
     setRange,
+    setReturnWindow,
     valueWindow,
     reload: loadAll,
     refreshPrices,

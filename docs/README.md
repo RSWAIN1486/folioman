@@ -5,7 +5,8 @@
 - [Run Folioman on your own computer](../BUILD.md) — the desktop app (build from
   source).
 - [Self-host with Docker](install-docker.md) — run the server for a family or
-  small team, with optional automatic HTTPS.
+  small team, with optional automatic HTTPS. Also the quickest verified way to
+  launch the web UI locally.
 - [Import a broker stock tradebook](import-tradebook.md) — equity transaction
   history from a CSV/XLSX export (column mapping wizard).
 
