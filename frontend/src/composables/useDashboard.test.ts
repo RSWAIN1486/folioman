@@ -74,6 +74,9 @@ const SERIES = [
   { date: '2025-01-01', value_inr: '0', invested_inr: '0', stale: false },
   { date: '2025-02-01', value_inr: '1200', invested_inr: '1000', stale: false },
   { date: '2025-03-01', value_inr: '3000', invested_inr: '1500', stale: false },
+  { date: '2025-05-29', value_inr: '7425', invested_inr: '1000', stale: false },
+  { date: '2025-05-30', value_inr: '7500', invested_inr: '1000', stale: false },
+  { date: '2025-05-31', value_inr: '7500', invested_inr: '1000', stale: false },
   { date: '2025-06-01', value_inr: '7500', invested_inr: '1000', stale: false },
 ]
 const TXNS = [
@@ -151,7 +154,7 @@ describe('useDashboard', () => {
     await flush()
     await flush()
 
-    expect(summary.value.valueSeries).toHaveLength(3)
+    expect(summary.value.valueSeries).toHaveLength(6)
     expect(summary.value.valueSeries[0].date).toBe('2025-02-01')
   })
 
@@ -286,8 +289,22 @@ describe('useDashboard', () => {
     await flush()
 
     expect(selectedReturn.value?.amount).toBeCloseTo(3500)
-    expect(selectedReturn.value?.annualizedPercent).not.toBeNull()
+    expect(selectedReturn.value?.percent).not.toBeNull()
+    expect(selectedReturn.value?.annualized).toBe(true)
     expect(selectedReturn.value?.direction).toBe('gain')
+  })
+
+  it('uses the backend trading-day delta for the 1D window across a flat weekend', async () => {
+    const { selectedReturn, setReturnWindow } = useDashboard(ref(1))
+    await flush()
+    await flush()
+
+    setReturnWindow('1D')
+    await flush()
+
+    expect(selectedReturn.value?.amount).toBe(75)
+    expect(selectedReturn.value?.percent).toBeCloseTo((75 / 7425) * 100)
+    expect(selectedReturn.value?.annualized).toBe(false)
   })
 
   it('reuses the headline all-time return and xirr for the all-time window', async () => {
@@ -299,7 +316,44 @@ describe('useDashboard', () => {
     await flush()
 
     expect(selectedReturn.value?.amount).toBe(6500)
-    expect(selectedReturn.value?.annualizedPercent).toBeCloseTo(18.49)
+    expect(selectedReturn.value?.percent).toBeCloseTo(18.49)
+    expect(selectedReturn.value?.annualized).toBe(true)
     expect(selectedReturn.value?.isAllTime).toBe(true)
+  })
+
+  it('computes all-time gain from lifetime cashflows instead of held cost basis alone', async () => {
+    get.mockImplementation((path: string) => {
+      if (path.endsWith('/summary')) {
+        return Promise.resolve({ data: { ...SUMMARY, total_inr: '8000', xirr: 0.1 } })
+      }
+      if (path.endsWith('/value-series')) {
+        return Promise.resolve({
+          data: {
+            points: [
+              { date: '2025-01-01', value_inr: '0', invested_inr: '0', stale: false },
+              { date: '2025-06-01', value_inr: '8000', invested_inr: '5000', stale: false },
+            ],
+          },
+        })
+      }
+      if (path.endsWith('/transactions')) {
+        return Promise.resolve({
+          data: [
+            { ...TXNS[0], id: 10, date: '2025-01-02', transaction_type: 'buy', amount: '10000' },
+            { ...TXNS[0], id: 11, date: '2025-04-01', transaction_type: 'sell', amount: '4000' },
+          ],
+        })
+      }
+      if (path.endsWith('/integrity')) return Promise.resolve({ data: INTEGRITY })
+      return Promise.resolve({ data: null })
+    })
+
+    const { allTimeReturn } = useDashboard(ref(1))
+    await flush()
+    await flush()
+
+    expect(allTimeReturn.value?.amount).toBe(2000)
+    expect(allTimeReturn.value?.percent).toBeCloseTo(10)
+    expect(allTimeReturn.value?.annualized).toBe(true)
   })
 })

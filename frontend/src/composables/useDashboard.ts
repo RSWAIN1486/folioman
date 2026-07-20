@@ -43,7 +43,8 @@ export interface ReturnWindowOption {
 
 export interface PeriodReturn {
   amount: number
-  annualizedPercent: number | null
+  percent: number | null
+  annualized: boolean
   fromDate: string
   toDate: string
   direction: 'gain' | 'loss' | 'flat'
@@ -137,14 +138,28 @@ function _transactionCash(txn: DashboardTransaction): number {
   return txn.amount == null ? num(txn.units) * num(txn.nav_or_price) : num(txn.amount)
 }
 
+function _signedFlow(txn: DashboardTransaction): SignedFlow | null {
+  const cash = _transactionCash(txn)
+  if (_CASH_IN_TYPES.has(txn.transaction_type)) return { date: txn.date, amount: cash }
+  if (_CASH_OUT_TYPES.has(txn.transaction_type) && cash) return { date: txn.date, amount: -cash }
+  return null
+}
+
 function _signedFlows(transactions: DashboardTransaction[], fromDate: string, toDate: string): SignedFlow[] {
   return transactions
     .filter((txn) => txn.date > fromDate && txn.date <= toDate)
     .flatMap<SignedFlow>((txn) => {
-      const cash = _transactionCash(txn)
-      if (_CASH_IN_TYPES.has(txn.transaction_type)) return [{ date: txn.date, amount: cash }]
-      if (_CASH_OUT_TYPES.has(txn.transaction_type) && cash) return [{ date: txn.date, amount: -cash }]
-      return []
+      const flow = _signedFlow(txn)
+      return flow ? [flow] : []
+    })
+}
+
+function _lifetimeSignedFlows(transactions: DashboardTransaction[], toDate: string): SignedFlow[] {
+  return transactions
+    .filter((txn) => txn.date <= toDate)
+    .flatMap<SignedFlow>((txn) => {
+      const flow = _signedFlow(txn)
+      return flow ? [flow] : []
     })
 }
 
@@ -228,6 +243,20 @@ function _cashflowsFromTransactions(
 
 function _direction(value: number): 'gain' | 'loss' | 'flat' {
   return value > 0 ? 'gain' : value < 0 ? 'loss' : 'flat'
+}
+
+function _sumFlows(flows: SignedFlow[]): number {
+  return flows.reduce((sum, flow) => sum + flow.amount, 0)
+}
+
+function _lastChangedPoint(points: ValuePointWithIso[]): ValuePointWithIso | null {
+  const latest = points.at(-1)
+  if (!latest) return null
+  for (let i = points.length - 2; i >= 0; i -= 1) {
+    const point = points[i]
+    if (point.current !== latest.current || point.invested !== latest.invested) return point
+  }
+  return points.at(-2) ?? null
 }
 
 export interface HoldingRow {
@@ -549,12 +578,16 @@ export function useDashboard(investorId: Ref<number>) {
     const s = summaryData.value
     const latest = fullValueSeries.value.at(-1)
     if (!s || !latest) return null
-    const invested = latest.invested
-    const amount = num(s.total_inr) - invested
+    const lifetimeFlows = transactionsLoaded.value
+      ? _lifetimeSignedFlows(transactions.value, latest.date)
+      : []
+    const amount =
+      lifetimeFlows.length > 0 ? latest.current - _sumFlows(lifetimeFlows) : num(s.total_inr) - latest.invested
     return {
       amount,
-      annualizedPercent: s.xirr == null ? null : s.xirr * 100,
-      fromDate: fullValueSeries.value[0]?.date ?? latest.date,
+      percent: s.xirr == null ? null : s.xirr * 100,
+      annualized: true,
+      fromDate: lifetimeFlows[0]?.date ?? fullValueSeries.value[0]?.date ?? latest.date,
       toDate: latest.date,
       direction: _direction(amount),
       isAllTime: true,
@@ -565,6 +598,22 @@ export function useDashboard(investorId: Ref<number>) {
     const latest = fullValueSeries.value.at(-1)
     if (!latest) return null
     if (returnWindow.value === 'All') return allTimeReturn.value
+    if (returnWindow.value === '1D') {
+      const s = summaryData.value
+      if (!s || s.day_change_inr == null) return null
+      const amount = num(s.day_change_inr)
+      const priorValue = latest.current - amount
+      const start = _lastChangedPoint(fullValueSeries.value)
+      return {
+        amount,
+        percent: priorValue > 0 ? (amount / priorValue) * 100 : null,
+        annualized: false,
+        fromDate: start?.date ?? latest.date,
+        toDate: latest.date,
+        direction: _direction(amount),
+        isAllTime: false,
+      }
+    }
     if (!transactionsLoaded.value) return null
 
     const targetStart = _shiftReturnWindow(latest.date, returnWindow.value)
@@ -576,7 +625,7 @@ export function useDashboard(investorId: Ref<number>) {
     if (!start || start.date >= latest.date) return null
 
     const flows = _signedFlows(transactions.value, start.date, latest.date)
-    const netInvested = flows.reduce((sum, flow) => sum + flow.amount, 0)
+    const netInvested = _sumFlows(flows)
     const amount = latest.current - start.current - netInvested
     const annualizedRate = _computeXirr(
       _cashflowsFromTransactions(
@@ -587,7 +636,8 @@ export function useDashboard(investorId: Ref<number>) {
     )
     return {
       amount,
-      annualizedPercent: annualizedRate == null ? null : annualizedRate * 100,
+      percent: annualizedRate == null ? null : annualizedRate * 100,
+      annualized: true,
       fromDate: start.date,
       toDate: latest.date,
       direction: _direction(amount),
@@ -746,6 +796,7 @@ export function useDashboard(investorId: Ref<number>) {
     range,
     returnWindow,
     returnWindowOptions: RETURN_WINDOW_OPTIONS,
+    allTimeReturn,
     selectedReturn,
     setRange,
     setReturnWindow,

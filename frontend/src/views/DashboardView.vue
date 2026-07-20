@@ -6,7 +6,12 @@ import Select from 'primevue/select'
 import IntegrityHealthCard from '@/components/IntegrityHealthCard.vue'
 import DeltaChip from '@/components/DeltaChip.vue'
 import AssetClassSummary from '@/views/dashboard/AssetClassSummary.vue'
-import { useDashboard, type RangeKey, type ReturnWindowKey } from '@/composables/useDashboard'
+import {
+  useDashboard,
+  type PeriodReturn,
+  type RangeKey,
+  type ReturnWindowKey,
+} from '@/composables/useDashboard'
 import { RANGES } from '@/utils/portfolio'
 import { useCountUp } from '@/composables/useCountUp'
 import { useMetaStore } from '@/stores/meta'
@@ -67,6 +72,7 @@ const {
   range,
   returnWindow,
   returnWindowOptions,
+  allTimeReturn,
   selectedReturn,
   setRange,
   setReturnWindow,
@@ -79,6 +85,7 @@ const {
   useDashboard(investorId)
 const showRefreshButton = computed(() => meta.loaded && !meta.readOnly)
 const returnCardClass = computed(() => selectedReturn.value?.direction ?? 'flat')
+const allTimeReturnClass = computed(() => allTimeReturn.value?.direction ?? 'flat')
 
 // Axis tick density follows the active range's sampling (see RANGES).
 const valueGranularity = computed(() => RANGES[range.value].granularity)
@@ -150,6 +157,11 @@ const allocationData = computed(() =>
 function formatSignedInr(value: number): string {
   const body = formatInr(Math.abs(value))
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${body}`
+}
+
+function formatReturnRate(ret: PeriodReturn): string | null {
+  if (ret.percent === null) return null
+  return `${formatPercent(ret.percent)}${ret.annualized ? ' p.a.' : ''}`
 }
 </script>
 
@@ -256,16 +268,6 @@ function formatSignedInr(value: number): string {
     <!-- Headline metrics strip. -->
     <section class="card stat-strip">
       <div class="stat">
-        <span class="eyebrow">All-time return</span>
-        <DeltaChip
-          :amount="summary.totalReturnAmount"
-          :percent="summary.totalReturnPercent ?? undefined"
-          :value="summary.totalReturnAmount"
-          size="md"
-          compact
-        />
-      </div>
-      <div class="stat">
         <span class="eyebrow">XIRR</span>
         <DeltaChip
           v-if="summary.xirr !== null"
@@ -287,8 +289,21 @@ function formatSignedInr(value: number): string {
         />
         <div v-if="selectedReturn" class="window-return" :class="returnCardClass">
           <span class="window-return-amount">{{ formatSignedInr(selectedReturn.amount) }}</span>
-          <span v-if="selectedReturn.annualizedPercent !== null" class="window-return-rate">
-            {{ formatPercent(selectedReturn.annualizedPercent) }} p.a.
+          <span v-if="formatReturnRate(selectedReturn)" class="window-return-rate">
+            {{ formatReturnRate(selectedReturn) }}
+          </span>
+          <span v-else class="window-return-rate muted">
+            {{ selectedReturn.annualized ? 'p.a. unavailable' : 'Rate unavailable' }}
+          </span>
+        </div>
+        <span v-else class="kpi-na">Needs more history</span>
+      </div>
+      <div class="stat stat-return">
+        <span class="eyebrow">All-time returns</span>
+        <div v-if="allTimeReturn" class="window-return" :class="allTimeReturnClass">
+          <span class="window-return-amount">{{ formatSignedInr(allTimeReturn.amount) }}</span>
+          <span v-if="formatReturnRate(allTimeReturn)" class="window-return-rate">
+            {{ formatReturnRate(allTimeReturn) }}
           </span>
           <span v-else class="window-return-rate muted">p.a. unavailable</span>
         </div>
