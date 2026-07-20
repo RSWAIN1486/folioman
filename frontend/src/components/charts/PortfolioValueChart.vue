@@ -5,6 +5,7 @@ import type { EChartsOption } from 'echarts'
 import '@/charts/echarts' // registers the tree-shaken ECharts modules (side-effect)
 import { useChartTokens } from '@/charts/useChartTokens'
 import { buildDataZoom, DATA_ZOOM_GRID_BOTTOM } from '@/charts/dataZoom'
+import { plotValueMarkers, type ValueMarker } from '@/charts/valueMarkers'
 import { formatInr, formatDate, formatDayMonth, formatMonthYear } from '@/utils/format'
 
 export interface ValuePoint {
@@ -20,6 +21,8 @@ const props = withDefaults(
     // Show the draggable zoom slider (a mini overview to focus any window). On by
     // default; callers in tight cards can turn it off.
     zoomable?: boolean
+    // Buy/sell transactions pinned to the current-value line.
+    markers?: ValueMarker[]
     // Initial zoom window [from, to] (ISO dates). The slider still shows the full
     // series; this just sets which portion is in view (e.g. a "1Y" preset). null =
     // show the whole range.
@@ -52,6 +55,8 @@ const axisLabel = computed(() =>
   props.granularity === 'monthly' ? formatMonthYear : formatDayMonth,
 )
 
+const plottedMarkers = computed(() => plotValueMarkers(props.data, props.markers ?? []))
+
 const option = computed<EChartsOption>(() => ({
   tooltip: {
     trigger: 'axis',
@@ -65,12 +70,21 @@ const option = computed<EChartsOption>(() => ({
         axisValue: string
         marker: string
         seriesName: string
-        value: number
+        value: number | [string, number]
+        data?: { date?: string; amount?: number | null; count?: number }
       }[]
       if (!rows.length) return ''
       const header = formatDate(rows[0].axisValue)
       const body = rows
-        .map((r) => `${r.marker} ${r.seriesName}: <b>${formatInr(r.value)}</b>`)
+        .map((r) => {
+          if (r.data?.date) {
+            const count = (r.data.count ?? 1) > 1 ? ` (${r.data.count} trades)` : ''
+            const amount = r.data.amount == null ? '' : `: <b>${formatInr(r.data.amount)}</b>`
+            return `${r.marker} ${r.seriesName}${count} · ${formatDate(r.data.date)}${amount}`
+          }
+          const value = Array.isArray(r.value) ? r.value[1] : r.value
+          return `${r.marker} ${r.seriesName}: <b>${formatInr(value)}</b>`
+        })
         .join('<br/>')
       return `<div style="margin-bottom:4px">${header}</div>${body}`
     },
@@ -80,7 +94,12 @@ const option = computed<EChartsOption>(() => ({
     right: 0,
     icon: 'roundRect',
     textStyle: { color: tokens.value.muted },
-    data: ['Current value', 'Invested'],
+    data: [
+      'Current value',
+      'Invested',
+      ...(plottedMarkers.value.some((m) => m.type === 'buy') ? ['Buy'] : []),
+      ...(plottedMarkers.value.some((m) => m.type === 'sell') ? ['Sell'] : []),
+    ],
   },
   grid: {
     left: 8,
@@ -146,6 +165,25 @@ const option = computed<EChartsOption>(() => ({
       lineStyle: { width: 1.5, type: 'dashed', color: tokens.value.muted },
       itemStyle: { color: tokens.value.muted },
       data: props.data.map((d) => d.invested),
+    },
+    {
+      name: 'Buy',
+      type: 'scatter',
+      symbol: 'triangle',
+      symbolSize: 10,
+      itemStyle: { color: tokens.value.gain },
+      data: plottedMarkers.value.filter((m) => m.type === 'buy'),
+      z: 3,
+    },
+    {
+      name: 'Sell',
+      type: 'scatter',
+      symbol: 'triangle',
+      symbolRotate: 180,
+      symbolSize: 10,
+      itemStyle: { color: tokens.value.loss },
+      data: plottedMarkers.value.filter((m) => m.type === 'sell'),
+      z: 3,
     },
   ],
 }))

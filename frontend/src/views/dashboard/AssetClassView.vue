@@ -35,7 +35,7 @@ const assetType = computed(() => String(route.params.assetType ?? ''))
 const classLabel = computed(() => assetLabel(assetType.value))
 const investorName = computed(() => roster.investorName(investorId.value) ?? 'Investor')
 
-const { summary, loading } = useDashboard(investorId)
+const { summary, loading, valueMarkers } = useDashboard(investorId)
 
 // Holdings of this asset class only.
 const holdings = computed(() =>
@@ -44,6 +44,10 @@ const holdings = computed(() =>
     .sort((a, b) => b.value - a.value),
 )
 const securityIds = computed(() => holdings.value.map((h) => h.securityId))
+const classMarkers = computed(() => {
+  const ids = new Set(securityIds.value)
+  return valueMarkers.value.filter((marker) => ids.has(marker.securityId))
+})
 
 // Class totals from the holdings (cost basis present only where known).
 const totals = computed(() => {
@@ -125,6 +129,7 @@ function qty(units: number): string {
       <PortfolioValueChart
         v-if="series.length"
         :data="series"
+        :markers="classMarkers"
         granularity="monthly"
         :window="null"
       />

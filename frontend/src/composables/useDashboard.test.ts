@@ -158,6 +158,18 @@ describe('useDashboard', () => {
     expect(summary.value.valueSeries[0].date).toBe('2025-02-01')
   })
 
+  it('opens the value chart on all-time history and maps trade markers', async () => {
+    const { range, valueWindow, valueMarkers } = useDashboard(ref(1))
+    await flush()
+    await flush()
+
+    expect(range.value).toBe('All')
+    expect(valueWindow.value).toBeNull()
+    expect(valueMarkers.value).toEqual([
+      { date: '2025-04-15', type: 'buy', amount: 1000, securityId: 1 },
+    ])
+  })
+
   it('builds allocation + top holdings and joins per-holding integrity', async () => {
     const { summary } = useDashboard(ref(1))
     await flush()

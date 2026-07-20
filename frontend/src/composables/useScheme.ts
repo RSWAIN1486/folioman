@@ -52,7 +52,7 @@ export function useScheme(investorId: Ref<number>, securityId: Ref<number>) {
       {
         params: {
           path: { investor_id: investorId.value, security_id: securityId.value },
-          query: { granularity: 'monthly' },
+          query: { granularity: 'daily' },
         },
       },
     )

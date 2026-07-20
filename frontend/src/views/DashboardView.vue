@@ -74,6 +74,7 @@ const {
   returnWindowOptions,
   allTimeReturn,
   selectedReturn,
+  valueMarkers,
   setRange,
   setReturnWindow,
   valueWindow,
@@ -235,6 +236,7 @@ function formatReturnRate(ret: PeriodReturn): string | null {
       <template v-if="loadCharts && summary.valueSeries?.length">
         <PortfolioValueChart
           :data="summary.valueSeries"
+          :markers="valueMarkers"
           :granularity="valueGranularity"
           :window="valueWindow"
         />

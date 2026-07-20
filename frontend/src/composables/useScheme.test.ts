@@ -88,6 +88,30 @@ describe('useScheme', () => {
     expect(integrityStatus.value).toBe('snapshot_only')
   })
 
+  it('loads daily all-time value history for transaction marker placement', async () => {
+    get.mockImplementation((path?: string) =>
+      path?.endsWith('/value-series')
+        ? Promise.resolve({
+            data: {
+              points: [{ date: '2025-06-01', value_inr: '2000', invested_inr: '1000' }],
+            },
+          })
+        : Promise.resolve({ data: DETAIL }),
+    )
+    const { loadValueSeries, valueSeries } = useScheme(ref(1), ref(1))
+    await flush()
+
+    await loadValueSeries()
+
+    expect(get).toHaveBeenCalledWith(
+      '/api/investors/{investor_id}/holdings/{security_id}/value-series',
+      expect.objectContaining({
+        params: { path: { investor_id: 1, security_id: 1 }, query: { granularity: 'daily' } },
+      }),
+    )
+    expect(valueSeries.value).toEqual([{ date: '2025-06-01', current: 2000, invested: 1000 }])
+  })
+
   it('flags notFound on a 404 (stale link to a sold scheme)', async () => {
     get.mockResolvedValue({ error: { detail: 'no holding' } })
     const { detail, notFound } = useScheme(ref(1), ref(999))

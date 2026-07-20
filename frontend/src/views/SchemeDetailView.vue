@@ -161,6 +161,16 @@ const navMarkers = computed(() =>
     })),
 )
 
+const valueMarkers = computed(() =>
+  (detail.value?.transactions ?? [])
+    .filter((t) => t.transaction_type === 'buy' || t.transaction_type === 'sell')
+    .map((t) => ({
+      date: t.date,
+      amount: t.amount == null ? num(t.units) * num(t.nav_or_price) : Math.abs(num(t.amount)),
+      type: t.transaction_type as 'buy' | 'sell',
+    })),
+)
+
 // Corporate actions pinned on the NAV line at their ex-date (split / bonus / merger).
 const navEvents = computed(() =>
   (detail.value?.corporate_actions ?? []).map((c) => ({
@@ -359,7 +369,9 @@ function back(): void {
           <PortfolioValueChart
             v-if="loadCharts && valueSeries.length"
             :data="valueSeries"
-            granularity="monthly"
+            :markers="valueMarkers"
+            granularity="daily"
+            :window="null"
           />
           <p v-else-if="loadCharts" class="muted empty">
             No day-wise value history yet — snapshot-only holdings count toward worth but not the

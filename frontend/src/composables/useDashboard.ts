@@ -2,6 +2,7 @@ import { computed, getCurrentScope, onScopeDispose, ref, watch, type Ref } from 
 import { api, type Schemas } from '@/api/client'
 import type { AllocationSlice } from '@/components/charts/AllocationDonut.vue'
 import type { ValuePoint } from '@/components/charts/PortfolioValueChart.vue'
+import type { ValueMarker } from '@/charts/valueMarkers'
 import { toIntegrityStatus, type IntegrityStatus } from '@/integrity/status'
 import { useIntegrityStore } from '@/stores/integrity'
 import { useUiStore } from '@/stores/ui'
@@ -67,6 +68,9 @@ const RETURN_WINDOW_OPTIONS: ReturnWindowOption[] = [
 
 type ValuePointWithIso = ValuePoint
 type DashboardTransaction = Schemas['TransactionOut']
+export interface DashboardValueMarker extends ValueMarker {
+  securityId: number
+}
 type SignedFlow = { date: string; amount: number }
 
 const _CASH_IN_TYPES = new Set(['buy', 'transfer_in'])
@@ -391,7 +395,7 @@ export function useDashboard(investorId: Ref<number>) {
   const series = ref<Schemas['ValueSeriesPoint'][]>([])
   const transactions = ref<DashboardTransaction[]>([])
   const transactionsLoaded = ref(false)
-  const range = ref<RangeKey>('1Y')
+  const range = ref<RangeKey>('All')
   const returnWindow = ref<ReturnWindowKey>('1D')
   const loading = ref(false)
   const refreshingPrices = ref(false)
@@ -573,6 +577,18 @@ export function useDashboard(investorId: Ref<number>) {
     const firstReal = points.findIndex((p) => p.current !== 0 || p.invested !== 0)
     return firstReal > 0 ? points.slice(firstReal) : points
   })
+
+  const valueMarkers = computed<DashboardValueMarker[]>(() =>
+    transactions.value
+      .filter((txn) => txn.transaction_type === 'buy' || txn.transaction_type === 'sell')
+      .map((txn) => ({
+        date: txn.date,
+        type: txn.transaction_type as 'buy' | 'sell',
+        amount:
+          txn.amount == null ? num(txn.units) * num(txn.nav_or_price) : Math.abs(num(txn.amount)),
+        securityId: txn.security_id,
+      })),
+  )
 
   const allTimeReturn = computed<PeriodReturn | null>(() => {
     const s = summaryData.value
@@ -798,6 +814,7 @@ export function useDashboard(investorId: Ref<number>) {
     returnWindowOptions: RETURN_WINDOW_OPTIONS,
     allTimeReturn,
     selectedReturn,
+    valueMarkers,
     setRange,
     setReturnWindow,
     valueWindow,
