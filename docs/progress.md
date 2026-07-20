@@ -1,7 +1,7 @@
 ## Completed
 - Added manual price-refresh actions in the Dashboard header and Settings → NAV freshness that refresh the advisor's tracked prices and recompute values immediately in both desktop and hosted/server mode.
 - Replaced the fixed dashboard 1D-return card with a return-window selector (1 day through all time) and a dedicated all-time return block in the shared web/desktop frontend.
-- Enabled mouse-wheel and trackpad zoom on the dashboard portfolio and individual mutual-fund charts while retaining the draggable overview slider.
+- Enabled mouse-wheel and trackpad zoom on value charts, with Y-axis bounds that rescale to the visible period, while retaining the draggable overview slider.
 - Added Buy/Sell transaction markers to portfolio, asset-class, and individual-security value charts; the dashboard value chart now opens on all-time history.
 - Automatic price refresh still runs on the shared 6-hour scheduler, with optional OS-level refresh while the desktop app is closed.
 

@@ -25,9 +25,16 @@ export const DATA_ZOOM_GRID_BOTTOM = 56
 export function buildDataZoom(t: ChartTokens): DataZoomComponentOption[] {
   return [
     // Scroll or pinch over the plot to zoom around the pointer; drag to pan.
-    { type: 'inside', throttle: 50, zoomOnMouseWheel: true, moveOnMouseWheel: false },
+    {
+      type: 'inside',
+      throttle: 50,
+      filterMode: 'filter',
+      zoomOnMouseWheel: true,
+      moveOnMouseWheel: false,
+    },
     {
       type: 'slider',
+      filterMode: 'filter',
       height: 26,
       bottom: 6,
       borderColor: t.border,

@@ -20,9 +20,10 @@ describe('buildDataZoom', () => {
 
     expect(inside).toMatchObject({
       type: 'inside',
+      filterMode: 'filter',
       zoomOnMouseWheel: true,
       moveOnMouseWheel: false,
     })
-    expect(slider).toMatchObject({ type: 'slider' })
+    expect(slider).toMatchObject({ type: 'slider', filterMode: 'filter' })
   })
 })

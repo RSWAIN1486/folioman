@@ -124,6 +124,8 @@ const option = computed<EChartsOption>(() => ({
   },
   yAxis: {
     type: 'value',
+    // Recalculate min/max from the zoomed window instead of forcing zero/all-time bounds.
+    scale: true,
     splitLine: { lineStyle: { color: tokens.value.border } },
     axisLabel: {
       color: tokens.value.muted,
