@@ -19,6 +19,9 @@ x-folioman-env: &folioman-env
   # Hosted-demo read-only mode (0/1). When 1, DemoReadOnlyMiddleware refuses every
   # state-changing API request server-side (see folioman_app/middleware.py).
   FOLIOMAN_DEMO: ${FOLIOMAN_DEMO:-0}
+  # Keep process counts configurable for memory-constrained hosts.
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
+  FOLIOMAN_THREADS: ${FOLIOMAN_THREADS:-2}
   # Postgres connection as a single 12-factor URL (host is the compose service name).
   # Built from the same vars the db service uses. NOTE: a password with URL-reserved
   # characters (@ : / #) must be percent-encoded here — prefer a URL-safe password.

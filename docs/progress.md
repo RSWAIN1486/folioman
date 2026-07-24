@@ -14,6 +14,7 @@
 - Read-only/demo instances keep the manual refresh control hidden; the backend still enforces write locks.
 - Local server-mode source runs mirror Docker's split runtime: keep `folioman_server` and `folioman_server run-scheduler` running separately, or dashboards stay provisional after imports.
 - MF catch-up backfill now repairs a missing previous trading-day NAV even when the latest NAV is already present, so dashboard 1D return uses the true latest two trading days in server mode.
+- Memory-constrained Docker hosts run one Gunicorn worker with two threads; the valuation scheduler remains a singleton.
 
 ## Blockers
 - None currently tracked.
