@@ -20,6 +20,7 @@ interface NavLink {
   icon: string
   to: RouteLocationRaw
   badge?: number
+  children?: NavLink[]
   /** Pinned to the bottom of the rail, below a spacer (Import / Integrity / Settings). */
   footer?: boolean
 }
@@ -65,6 +66,53 @@ const navLinks = computed<NavLink[]>(() => {
       icon: 'pi pi-file-edit',
       to: { name: 'capital-gains', params: { investorId } },
     })
+    links.push({
+      label: 'AI Workspace',
+      icon: 'pi pi-sparkles',
+      to: { name: 'ai-workspace', params: { investorId } },
+      children: [
+        {
+          label: 'Portfolio Health',
+          icon: 'pi pi-shield',
+          to: { name: 'ai-workspace', params: { investorId, module: 'health' } },
+        },
+        {
+          label: 'Daily Brief',
+          icon: 'pi pi-sun',
+          to: { name: 'ai-workspace', params: { investorId, module: 'brief' } },
+        },
+        {
+          label: 'Goals & SIP',
+          icon: 'pi pi-flag',
+          to: { name: 'ai-workspace', params: { investorId, module: 'goals' } },
+        },
+        {
+          label: 'Fund Research',
+          icon: 'pi pi-search',
+          to: { name: 'ai-workspace', params: { investorId, module: 'research' } },
+        },
+        {
+          label: 'Scheme Monitor',
+          icon: 'pi pi-bell',
+          to: { name: 'ai-workspace', params: { investorId, module: 'monitor' } },
+        },
+        {
+          label: 'Tax Planner',
+          icon: 'pi pi-calculator',
+          to: { name: 'ai-workspace', params: { investorId, module: 'tax' } },
+        },
+        {
+          label: 'What-If',
+          icon: 'pi pi-sliders-h',
+          to: { name: 'ai-workspace', params: { investorId, module: 'what-if' } },
+        },
+        {
+          label: 'Chat',
+          icon: 'pi pi-comments',
+          to: { name: 'ai-workspace', params: { investorId, module: 'chat' } },
+        },
+      ],
+    })
   }
   if (ui.selectedFamilyId !== null) {
     links.push({
@@ -98,6 +146,7 @@ const MOBILE_TABS = new Set([
   'Dashboard',
   'Integrity',
   'Capital Gains',
+  'AI Workspace',
   'Family',
   'Settings',
 ])
@@ -170,20 +219,32 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <nav class="side-nav">
-        <RouterLink
-          v-for="link in topLinks"
-          :key="link.label"
-          v-tooltip.right="railTooltip(link.label)"
-          :to="link.to"
-          class="nav-link"
-          active-class="is-active"
-        >
-          <i :class="link.icon" />
-          <span class="nav-label">{{ link.label }}</span>
-          <span v-if="link.badge" class="nav-badge" :title="`${link.badge} need attention`">{{
-            link.badge
-          }}</span>
-        </RouterLink>
+        <template v-for="link in topLinks" :key="link.label">
+          <RouterLink
+            v-tooltip.right="railTooltip(link.label)"
+            :to="link.to"
+            class="nav-link"
+            active-class="is-active"
+          >
+            <i :class="link.icon" />
+            <span class="nav-label">{{ link.label }}</span>
+            <span v-if="link.badge" class="nav-badge" :title="`${link.badge} need attention`">{{
+              link.badge
+            }}</span>
+          </RouterLink>
+          <div v-if="link.children?.length" class="nav-children">
+            <RouterLink
+              v-for="child in link.children"
+              :key="child.label"
+              :to="child.to"
+              class="nav-child"
+              exact-active-class="is-active"
+            >
+              <i :class="child.icon" />
+              <span>{{ child.label }}</span>
+            </RouterLink>
+          </div>
+        </template>
         <span class="nav-spacer" aria-hidden="true" />
         <RouterLink
           v-for="link in footerLinks"
@@ -376,6 +437,37 @@ nav {
   border-radius: 0 var(--fm-radius-pill) var(--fm-radius-pill) 0;
   background: var(--p-primary-color);
 }
+.nav-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0.1rem 0 0.35rem 1.35rem;
+  padding-left: 0.65rem;
+  border-left: 1px solid var(--fm-border);
+}
+.nav-child {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.9rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: var(--fm-radius-sm);
+  color: var(--fm-text-muted);
+  text-decoration: none;
+  font-size: 0.75rem;
+}
+.nav-child i {
+  width: 0.85rem;
+  font-size: 0.72rem;
+}
+.nav-child:hover {
+  color: var(--fm-text);
+  background: var(--fm-surface-raised);
+}
+.nav-child.is-active {
+  color: var(--p-primary-color);
+  font-weight: 600;
+}
 .nav-label {
   flex: 1;
 }
@@ -429,7 +521,8 @@ nav {
   margin-left: 0;
 }
 .is-collapsed .brand-name,
-.is-collapsed .nav-label {
+.is-collapsed .nav-label,
+.is-collapsed .nav-children {
   display: none;
 }
 .is-collapsed .nav-link {

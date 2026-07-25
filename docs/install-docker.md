@@ -65,6 +65,10 @@ Then set:
 
 `server/.env` is git-ignored. Keep it (and especially `FOLIOMAN_FERNET_KEY`) safe.
 
+Optional AI chat configuration is documented in
+[AI workspace](ai-workspace.md#external-chat-providers). Provider keys stay in
+`server/.env` and are passed only to the `app` container.
+
 ## 3. Start the stack
 
 ```bash
@@ -86,6 +90,38 @@ For a purely local launch, open:
 ```txt
 http://127.0.0.1:8000/setup
 ```
+
+### Optional local HTTPS with Caddy
+
+Use the dedicated local override, not the hosted-domain override:
+
+```bash
+docker compose -f server/docker-compose.yml \
+  -f deploy/local/compose.caddy.yml up -d --build
+
+curl -k https://localhost/api/health
+```
+
+Open `https://localhost`. Caddy uses an internal development CA for loopback
+HTTPS, so the browser will not trust it until its root certificate is added to
+the local trust store. On macOS, copy the generated root certificate and
+optionally trust it in the login keychain:
+
+```bash
+docker cp server-caddy-1:/data/caddy/pki/authorities/local/root.crt \
+  /tmp/folioman-caddy-root.crt
+
+security add-trusted-cert -r trustRoot \
+  -k "$HOME/Library/Keychains/login.keychain-db" \
+  /tmp/folioman-caddy-root.crt
+```
+
+The second command changes the current user's certificate trust settings and
+may prompt for confirmation. Remove that certificate from Keychain Access when
+local Caddy HTTPS is no longer needed.
+
+The hosted override under `deploy/hosted/` is only for a public domain whose DNS
+points at the server; it obtains and renews a publicly trusted certificate.
 
 ## 4. Create the first login
 

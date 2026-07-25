@@ -265,6 +265,40 @@ export interface paths {
         patch: operations["folioman_app_api_investors_update_investor"];
         trace?: never;
     };
+    "/api/investors/{investor_id}/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Agent Chat */
+        post: operations["folioman_app_api_agent_agent_chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/investors/{investor_id}/agent/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Overview */
+        get: operations["folioman_app_api_agent_agent_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/investors/{investor_id}/exports/capital-gains": {
         parameters: {
             query?: never;
@@ -963,6 +997,134 @@ export interface components {
         AccessOut: {
             /** Access */
             access: string;
+        };
+        /** AgentAllocationOut */
+        AgentAllocationOut: {
+            /** Label */
+            label: string;
+            /** Share Pct */
+            share_pct: number;
+            /** Value Inr */
+            value_inr: string;
+        };
+        /** AgentChatIn */
+        AgentChatIn: {
+            /** Message */
+            message: string;
+        };
+        /** AgentChatOut */
+        AgentChatOut: {
+            /** Answer */
+            answer: string;
+            /** Assumptions */
+            assumptions: string[];
+            /**
+             * Data As Of
+             * Format: date
+             */
+            data_as_of: string;
+            /** External Transmission */
+            external_transmission: boolean;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "local-deterministic" | "external-ai";
+            /** Model */
+            model?: string | null;
+            /** Pii Redactions */
+            pii_redactions: number;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "local" | "openai" | "openrouter";
+            /** Sources */
+            sources: string[];
+        };
+        /** AgentFindingOut */
+        AgentFindingOut: {
+            /** Detail */
+            detail: string;
+            /** Metric */
+            metric?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+            /** Title */
+            title: string;
+        };
+        /** AgentHoldingOut */
+        AgentHoldingOut: {
+            /** Day Change Inr */
+            day_change_inr?: string | null;
+            /** Label */
+            label: string;
+            /** Security Name */
+            security_name: string;
+            /** Share Pct */
+            share_pct: number;
+            /** Value Inr */
+            value_inr?: string | null;
+        };
+        /** AgentMetricsOut */
+        AgentMetricsOut: {
+            /** Day Change Inr */
+            day_change_inr?: string | null;
+            /** Holdings Count */
+            holdings_count: number;
+            /** Integrity Unit Count */
+            integrity_unit_count: number;
+            /** Tax Ready Count */
+            tax_ready_count: number;
+            /** Total Inr */
+            total_inr: string;
+            /** Xirr */
+            xirr?: number | null;
+        };
+        /** AgentOverviewOut */
+        AgentOverviewOut: {
+            /** Allocation */
+            allocation: components["schemas"]["AgentAllocationOut"][];
+            /** Assumptions */
+            assumptions: string[];
+            /** Daily Brief */
+            daily_brief: string[];
+            /**
+             * Data As Of
+             * Format: date
+             */
+            data_as_of: string;
+            /** Findings */
+            findings: components["schemas"]["AgentFindingOut"][];
+            /** Formula Notes */
+            formula_notes: string[];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Health Label */
+            health_label: string;
+            /** Health Score */
+            health_score: number;
+            metrics: components["schemas"]["AgentMetricsOut"];
+            /** Navs As Of */
+            navs_as_of?: string | null;
+            privacy: components["schemas"]["AgentPrivacyOut"];
+            /** Top Holdings */
+            top_holdings: components["schemas"]["AgentHoldingOut"][];
+        };
+        /** AgentPrivacyOut */
+        AgentPrivacyOut: {
+            /** Excluded Fields */
+            excluded_fields: string[];
+            /** External Transmission */
+            external_transmission: boolean;
+            /** Mode */
+            mode: string;
         };
         /**
          * AllocationBucket
@@ -2812,6 +2974,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvestorOut"];
+                };
+            };
+        };
+    };
+    folioman_app_api_agent_agent_chat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatIn"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatOut"];
+                };
+            };
+        };
+    };
+    folioman_app_api_agent_agent_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentOverviewOut"];
                 };
             };
         };

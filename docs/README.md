@@ -6,9 +6,13 @@
   source).
 - [Self-host with Docker](install-docker.md) — run the server for a family or
   small team, with optional automatic HTTPS. Also the quickest verified way to
-  launch the web UI locally.
+  launch the web UI locally, including
+  [localhost HTTPS with Caddy](install-docker.md#optional-local-https-with-caddy).
 - [Import a broker stock tradebook](import-tradebook.md) — equity transaction
   history from a CSV/XLSX export (column mapping wizard).
+- [AI workspace](ai-workspace.md) — deterministic portfolio health, daily brief,
+  goal and scenario tools, plus optional OpenAI/OpenRouter chat behind the
+  PII-safe context boundary.
 
 ## For developers & operators
 

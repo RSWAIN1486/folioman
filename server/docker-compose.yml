@@ -37,7 +37,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment: *folioman-env
+    environment:
+      <<: *folioman-env
+      # Optional external chat provider. Keep keys on the server; never expose
+      # them through VITE_* variables or the browser bundle.
+      FOLIOMAN_AI_PROVIDER: ${FOLIOMAN_AI_PROVIDER:-local}
+      FOLIOMAN_AI_MODEL: ${FOLIOMAN_AI_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     ports:
       - "${FOLIOMAN_PORT:-8000}:8000"
     healthcheck:

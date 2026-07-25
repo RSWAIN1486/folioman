@@ -14,6 +14,382 @@
         "title": "AccessOut",
         "type": "object"
       },
+      "AgentAllocationOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "share_pct": {
+            "title": "Share Pct",
+            "type": "number"
+          },
+          "value_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Value Inr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value_inr",
+          "share_pct"
+        ],
+        "title": "AgentAllocationOut",
+        "type": "object"
+      },
+      "AgentChatIn": {
+        "properties": {
+          "message": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "AgentChatIn",
+        "type": "object"
+      },
+      "AgentChatOut": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "data_as_of": {
+            "format": "date",
+            "title": "Data As Of",
+            "type": "string"
+          },
+          "external_transmission": {
+            "title": "External Transmission",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "local-deterministic",
+              "external-ai"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "pii_redactions": {
+            "title": "Pii Redactions",
+            "type": "integer"
+          },
+          "provider": {
+            "enum": [
+              "local",
+              "openai",
+              "openrouter"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "answer",
+          "mode",
+          "provider",
+          "data_as_of",
+          "pii_redactions",
+          "external_transmission",
+          "sources",
+          "assumptions"
+        ],
+        "title": "AgentChatOut",
+        "type": "object"
+      },
+      "AgentFindingOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "title",
+          "detail"
+        ],
+        "title": "AgentFindingOut",
+        "type": "object"
+      },
+      "AgentHoldingOut": {
+        "properties": {
+          "day_change_inr": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Inr"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "security_name": {
+            "title": "Security Name",
+            "type": "string"
+          },
+          "share_pct": {
+            "title": "Share Pct",
+            "type": "number"
+          },
+          "value_inr": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Inr"
+          }
+        },
+        "required": [
+          "label",
+          "security_name",
+          "share_pct"
+        ],
+        "title": "AgentHoldingOut",
+        "type": "object"
+      },
+      "AgentMetricsOut": {
+        "properties": {
+          "day_change_inr": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Inr"
+          },
+          "holdings_count": {
+            "title": "Holdings Count",
+            "type": "integer"
+          },
+          "integrity_unit_count": {
+            "title": "Integrity Unit Count",
+            "type": "integer"
+          },
+          "tax_ready_count": {
+            "title": "Tax Ready Count",
+            "type": "integer"
+          },
+          "total_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Inr",
+            "type": "string"
+          },
+          "xirr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xirr"
+          }
+        },
+        "required": [
+          "total_inr",
+          "holdings_count",
+          "tax_ready_count",
+          "integrity_unit_count"
+        ],
+        "title": "AgentMetricsOut",
+        "type": "object"
+      },
+      "AgentOverviewOut": {
+        "properties": {
+          "allocation": {
+            "items": {
+              "$ref": "#/components/schemas/AgentAllocationOut"
+            },
+            "title": "Allocation",
+            "type": "array"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "daily_brief": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Daily Brief",
+            "type": "array"
+          },
+          "data_as_of": {
+            "format": "date",
+            "title": "Data As Of",
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/AgentFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "formula_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formula Notes",
+            "type": "array"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "health_label": {
+            "title": "Health Label",
+            "type": "string"
+          },
+          "health_score": {
+            "title": "Health Score",
+            "type": "integer"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/AgentMetricsOut"
+          },
+          "navs_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Navs As Of"
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/AgentPrivacyOut"
+          },
+          "top_holdings": {
+            "items": {
+              "$ref": "#/components/schemas/AgentHoldingOut"
+            },
+            "title": "Top Holdings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generated_at",
+          "data_as_of",
+          "privacy",
+          "health_score",
+          "health_label",
+          "findings",
+          "daily_brief",
+          "metrics",
+          "allocation",
+          "top_holdings",
+          "formula_notes",
+          "assumptions"
+        ],
+        "title": "AgentOverviewOut",
+        "type": "object"
+      },
+      "AgentPrivacyOut": {
+        "properties": {
+          "excluded_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Fields",
+            "type": "array"
+          },
+          "external_transmission": {
+            "title": "External Transmission",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "external_transmission",
+          "excluded_fields"
+        ],
+        "title": "AgentPrivacyOut",
+        "type": "object"
+      },
       "AllocationBucket": {
         "description": "One slice of a sub-asset-class allocation breakdown (by AMC, by category).",
         "properties": {
@@ -4124,6 +4500,80 @@
         "summary": "Update Investor",
         "tags": [
           "investors"
+        ]
+      }
+    },
+    "/api/investors/{investor_id}/agent/chat": {
+      "post": {
+        "operationId": "folioman_app_api_agent_agent_chat",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "investor_id",
+            "required": true,
+            "schema": {
+              "title": "Investor Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentChatOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Agent Chat",
+        "tags": [
+          "AI workspace"
+        ]
+      }
+    },
+    "/api/investors/{investor_id}/agent/overview": {
+      "get": {
+        "operationId": "folioman_app_api_agent_agent_overview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "investor_id",
+            "required": true,
+            "schema": {
+              "title": "Investor Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOverviewOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Agent Overview",
+        "tags": [
+          "AI workspace"
         ]
       }
     },

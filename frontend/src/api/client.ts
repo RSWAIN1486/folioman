@@ -11,6 +11,8 @@ export type FamilyIn = Schemas['FamilyIn']
 export type FolioOut = Schemas['FolioOut']
 export type ImportJobOut = Schemas['ImportJobOut']
 export type CasPreviewOut = Schemas['CasPreviewOut']
+export type AgentOverviewOut = Schemas['AgentOverviewOut']
+export type AgentChatOut = Schemas['AgentChatOut']
 
 /**
  * Typed HTTP client keyed by the OpenAPI paths (regenerate types with
@@ -46,6 +48,27 @@ export function unwrap<T>(res: { data?: T; error?: unknown }, message: string): 
 /** Smoke helper proving the typed client wires through end to end. */
 export async function listInvestors(): Promise<InvestorOut[]> {
   return unwrap(await api.GET('/api/investors/'), 'Failed to load investors')
+}
+
+/** Identity-free deterministic analysis shared by every AI workspace module. */
+export async function getAgentOverview(investorId: number): Promise<AgentOverviewOut> {
+  return unwrap(
+    await api.GET('/api/investors/{investor_id}/agent/overview', {
+      params: { path: { investor_id: investorId } },
+    }),
+    'Failed to load portfolio analysis',
+  )
+}
+
+/** Local analysis chat. The backend redacts common PII patterns before answering. */
+export async function sendAgentMessage(investorId: number, message: string): Promise<AgentChatOut> {
+  return unwrap(
+    await api.POST('/api/investors/{investor_id}/agent/chat', {
+      params: { path: { investor_id: investorId } },
+      body: { message },
+    }),
+    'Portfolio analysis failed',
+  )
 }
 
 /** Build the multipart body for a CAS upload (the browser sets the boundary).

@@ -109,6 +109,10 @@ so `make test` (core + app suites) needs no environment setup. For ad-hoc local
 | `DATABASE_URL` | server | (none) | Postgres connection URL — required in server mode |
 | `FOLIOMAN_DB_CONN_MAX_AGE` | server | `60` | Persistent connection lifetime (seconds) |
 | `FOLIOMAN_LOG_DIR` | server | (console only) | If set, also write rotating file logs here |
+| `FOLIOMAN_AI_PROVIDER` | both | `local` | Optional chat provider: `local`, `openai`, or `openrouter` |
+| `FOLIOMAN_AI_MODEL` | both | (none) | Explicit provider model ID; required for external chat |
+| `OPENAI_API_KEY` | both | (none) | Server-side OpenAI key; never expose through `VITE_*` |
+| `OPENROUTER_API_KEY` | both | (none) | Server-side OpenRouter key; never expose through `VITE_*` |
 
 Server bind/worker variables (`FOLIOMAN_HOST`, `FOLIOMAN_WORKERS`, ...) are
 documented in [server.md](server.md).
@@ -118,6 +122,9 @@ For repo-local source runs of `python -m folioman_server`, put `DATABASE_URL`,
 loads that automatically. `server/.env` is for Docker Compose only. Run
 `python -m folioman_server` and `python -m folioman_server run-scheduler` in
 separate terminals so server-mode valuations can finish computing.
+
+External AI chat configuration and its outbound privacy boundary are documented
+in [AI workspace](../ai-workspace.md#external-chat-providers).
 
 ## Authentication
 

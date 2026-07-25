@@ -1,0 +1,26 @@
+# Local HTTPS override. Run from the repository root:
+#
+#   docker compose -f server/docker-compose.yml \
+#     -f deploy/local/compose.caddy.yml up -d --build
+#
+# Compose resolves relative bind mounts from the first file's project directory
+# (`server/`), so the Caddyfile path below points back into `deploy/local/`.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../deploy/local/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

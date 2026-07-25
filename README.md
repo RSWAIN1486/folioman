@@ -47,10 +47,12 @@ and edits are disabled.
 
 ## Privacy & network
 
-Folioman is **local-first**: no account, no sign-up, no analytics, and no
-telemetry. Your CAS statements, holdings, transactions, and PANs live only where
-the app runs (PANs are encrypted at rest), and **none of your data is ever sent
-anywhere**.
+Folioman is **local-first**: no analytics or telemetry. Your CAS statements,
+holdings, transactions, and PANs live only where the app runs (PANs are
+encrypted at rest). By default, no portfolio or chat data is sent to an AI
+provider. If you explicitly enable optional OpenAI or OpenRouter chat, Folioman
+sends only its allow-listed portfolio context and redacted question; raw CAS
+documents and investor identity fields remain excluded.
 
 To actually value your portfolio, though, the app fetches **public market and
 reference data** over the network — never anything that identifies you:
@@ -60,6 +62,7 @@ reference data** over the network — never anything that identifies you:
 | Mutual-fund NAVs | mfapi.in (AMFI data) | the fund's AMFI code | per-fund requests reveal *which* funds you hold to that service |
 | ISIN / AMFI reference DB (casparser-isin) | casparser.atomcoder.com | nothing identifying | fetched as one whole file — reveals nothing about your holdings |
 | Equities / crypto quotes *(planned)* | Yahoo / NSE / CoinGecko | the ticker / coin id | per-symbol requests, same holdings caveat as NAVs |
+| AI chat *(optional, off by default)* | OpenAI or OpenRouter | allow-listed portfolio context + redacted question | excludes investor identity, PAN, email, folio/account IDs, raw CAS and transaction narration |
 
 These requests carry **no account, no PAN, no portfolio** — only the public
 symbol/code needed to price a holding. We prefer **bulk** feeds (the whole ISIN
@@ -85,6 +88,29 @@ Run Folioman as a small web app on your own server or home machine using Docker,
 and reach it from any browser.
 
 ➡️ **[Self-host Folioman with Docker](docs/install-docker.md)**
+
+For local Docker HTTPS, layer on the dedicated Caddy override:
+
+```bash
+docker compose -f server/docker-compose.yml \
+  -f deploy/local/compose.caddy.yml up -d --build
+```
+
+Open `https://localhost`. Caddy uses a local development CA, so macOS browsers
+will show a certificate warning until its generated root is trusted:
+
+```bash
+docker cp server-caddy-1:/data/caddy/pki/authorities/local/root.crt \
+  /tmp/folioman-caddy-root.crt
+
+security add-trusted-cert -r trustRoot \
+  -k "$HOME/Library/Keychains/login.keychain-db" \
+  /tmp/folioman-caddy-root.crt
+```
+
+The trust command changes the current user's login keychain and may prompt for
+confirmation. See the [Docker guide](docs/install-docker.md#optional-local-https-with-caddy)
+for verification and removal notes.
 
 ## Not tax advice
 

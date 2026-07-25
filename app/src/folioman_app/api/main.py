@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from ninja import NinjaAPI
 
+from folioman_app.api.agent import router as agent_router
 from folioman_app.api.auth import FoliomanAuth
 from folioman_app.api.exports import router as exports_router
 from folioman_app.api.families import router as families_router
@@ -34,6 +35,7 @@ api.add_router("", meta_router)  # /meta — app version + data location
 api.add_router("", jobs_router)  # /jobs — advisor-wide import + valuation activity
 api.add_router("", navs_router)  # /navs/* — NAV freshness + manual refresh
 api.add_router("/investors", investors_router)
+api.add_router("/investors", agent_router)
 api.add_router("/imports", cas_router)  # /imports/cas, /imports/cas/preview (PAN-resolved)
 api.add_router("/investors", imports_router)  # /investors/{id}/imports/... (job reads + csv)
 api.add_router("/investors", exports_router)  # /investors/{id}/exports/...
