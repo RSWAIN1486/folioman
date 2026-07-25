@@ -116,6 +116,7 @@ def answer_with_provider(
     config: ProviderConfig,
     overview: dict,
     question: str,
+    history: list[dict[str, str]] | None = None,
 ) -> ProviderAnswer:
     """Request an explanation from a fixed, server-side provider endpoint."""
     context = json.dumps(
@@ -124,10 +125,20 @@ def answer_with_provider(
         ensure_ascii=True,
         separators=(",", ":"),
     )
+    conversation = ""
+    if history:
+        lines = [
+            f"{item['role'].capitalize()}: {item['content']}"
+            for item in history[-12:]
+            if item.get("role") in {"user", "assistant"} and item.get("content")
+        ]
+        if lines:
+            transcript = "\n".join(lines)
+            conversation = f"Recent redacted conversation:\n{transcript}\n\n"
     request_body: dict = {
         "model": config.model,
         "instructions": _INSTRUCTIONS,
-        "input": f"Portfolio context:\n{context}\n\nUser question:\n{question}",
+        "input": f"{conversation}Portfolio context:\n{context}\n\nUser question:\n{question}",
         "max_output_tokens": 800,
         "store": False,
     }

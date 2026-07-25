@@ -13,6 +13,8 @@ export type ImportJobOut = Schemas['ImportJobOut']
 export type CasPreviewOut = Schemas['CasPreviewOut']
 export type AgentOverviewOut = Schemas['AgentOverviewOut']
 export type AgentChatOut = Schemas['AgentChatOut']
+export type AgentChatSessionOut = Schemas['AgentChatSessionOut']
+export type AgentChatSessionDetailOut = Schemas['AgentChatSessionDetailOut']
 
 /**
  * Typed HTTP client keyed by the OpenAPI paths (regenerate types with
@@ -60,12 +62,59 @@ export async function getAgentOverview(investorId: number): Promise<AgentOvervie
   )
 }
 
-/** Local analysis chat. The backend redacts common PII patterns before answering. */
-export async function sendAgentMessage(investorId: number, message: string): Promise<AgentChatOut> {
+/** Advisor-owned encrypted chat sessions for the selected investor. */
+export async function listAgentSessions(investorId: number): Promise<AgentChatSessionOut[]> {
+  return unwrap(
+    await api.GET('/api/investors/{investor_id}/agent/sessions', {
+      params: { path: { investor_id: investorId } },
+    }),
+    'Failed to load chat history',
+  )
+}
+
+export async function getAgentSession(
+  investorId: number,
+  sessionId: number,
+): Promise<AgentChatSessionDetailOut> {
+  return unwrap(
+    await api.GET('/api/investors/{investor_id}/agent/sessions/{session_id}', {
+      params: { path: { investor_id: investorId, session_id: sessionId } },
+    }),
+    'Failed to load this chat',
+  )
+}
+
+export async function renameAgentSession(
+  investorId: number,
+  sessionId: number,
+  title: string,
+): Promise<AgentChatSessionOut> {
+  return unwrap(
+    await api.PATCH('/api/investors/{investor_id}/agent/sessions/{session_id}', {
+      params: { path: { investor_id: investorId, session_id: sessionId } },
+      body: { title },
+    }),
+    'Failed to rename this chat',
+  )
+}
+
+export async function deleteAgentSession(investorId: number, sessionId: number): Promise<void> {
+  const result = await api.DELETE('/api/investors/{investor_id}/agent/sessions/{session_id}', {
+    params: { path: { investor_id: investorId, session_id: sessionId } },
+  })
+  if (result.error !== undefined) throw new Error('Failed to delete this chat')
+}
+
+/** Redacted, encrypted analysis chat with an optional persisted conversation. */
+export async function sendAgentMessage(
+  investorId: number,
+  message: string,
+  sessionId?: number,
+): Promise<AgentChatOut> {
   return unwrap(
     await api.POST('/api/investors/{investor_id}/agent/chat', {
       params: { path: { investor_id: investorId } },
-      body: { message },
+      body: { message, session_id: sessionId },
     }),
     'Portfolio analysis failed',
   )

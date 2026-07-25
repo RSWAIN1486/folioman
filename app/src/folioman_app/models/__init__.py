@@ -5,6 +5,7 @@ what `django.apps` imports). master = global reference data; ledger / integrity
 / licensing layer on top.
 """
 
+from folioman_app.models.agent import AgentChatMessage, AgentChatSession
 from folioman_app.models.integrity import SecurityIntegrityStatus
 from folioman_app.models.jobs import ImportJob, ImportQuarantine
 from folioman_app.models.ledger import (
@@ -29,6 +30,8 @@ from folioman_app.models.master import (
 
 __all__ = [
     "AMC",
+    "AgentChatMessage",
+    "AgentChatSession",
     "AppliedCorporateAction",
     "CorporateActionReference",
     "FXRate",

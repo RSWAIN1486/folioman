@@ -2,7 +2,16 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import { getAgentOverview, sendAgentMessage, type AgentOverviewOut } from '@/api/client'
+import {
+  deleteAgentSession,
+  getAgentOverview,
+  getAgentSession,
+  listAgentSessions,
+  renameAgentSession,
+  sendAgentMessage,
+  type AgentChatSessionOut,
+  type AgentOverviewOut,
+} from '@/api/client'
 import { formatDate, formatInr, formatInrCompact, formatPercent, toNumber } from '@/utils/format'
 
 type ModuleKey =
@@ -36,13 +45,10 @@ const loading = ref(true)
 const error = ref('')
 const prompt = ref('')
 const sending = ref(false)
-const messages = ref<ChatMessage[]>([
-  {
-    role: 'assistant',
-    text: 'Ask about portfolio value, latest-day change, XIRR, allocation, concentration, integrity, or tax readiness.',
-    meta: 'Provider selected securely by the server',
-  },
-])
+const messages = ref<ChatMessage[]>([])
+const sessions = ref<AgentChatSessionOut[]>([])
+const chatLoading = ref(false)
+const chatError = ref('')
 
 const goalTarget = ref(20_000_000)
 const goalYears = ref(10)
@@ -71,6 +77,11 @@ const activeModule = computed<ModuleKey>(() => {
 const activeMeta = computed(
   () => modules.find((item) => item.key === activeModule.value) ?? modules[0]!,
 )
+const activeSessionId = computed(() => {
+  const value = Array.isArray(route.query.session) ? route.query.session[0] : route.query.session
+  const parsed = typeof value === 'string' ? Number(value) : Number.NaN
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+})
 
 const healthTone = computed(() => {
   const score = overview.value?.health_score ?? 0
@@ -111,7 +122,87 @@ function openModule(key: ModuleKey): void {
   void router.push({
     name: 'ai-workspace',
     params: { investorId: investorId.value, module: key === 'overview' ? undefined : key },
+    query: key === 'chat' ? route.query : {},
   })
+}
+
+function messageMeta(message: {
+  role: 'assistant' | 'user'
+  provider: 'local' | 'openai' | 'openrouter'
+  model?: string | null
+  external_transmission: boolean
+  pii_redactions: number
+}): string | undefined {
+  if (message.role === 'user') return undefined
+  const redactions =
+    message.pii_redactions > 0
+      ? ` · ${message.pii_redactions} identifier${message.pii_redactions === 1 ? '' : 's'} redacted`
+      : ''
+  return message.external_transmission
+    ? `${message.provider} · ${message.model ?? 'configured model'} · de-identified context sent externally${redactions}`
+    : `Local deterministic analysis · no external transmission${redactions}`
+}
+
+async function loadChatSession(sessionId: number): Promise<void> {
+  const session = await getAgentSession(investorId.value, sessionId)
+  messages.value = session.messages.map((message) => ({
+    role: message.role,
+    text: message.content,
+    meta: messageMeta(message),
+  }))
+}
+
+async function loadChatWorkspace(): Promise<void> {
+  if (activeModule.value !== 'chat' || !Number.isFinite(investorId.value)) return
+  chatLoading.value = true
+  chatError.value = ''
+  try {
+    sessions.value = await listAgentSessions(investorId.value)
+    if (activeSessionId.value !== null) {
+      await loadChatSession(activeSessionId.value)
+    } else {
+      messages.value = []
+    }
+  } catch (err) {
+    chatError.value = err instanceof Error ? err.message : 'Could not load chat history'
+  } finally {
+    chatLoading.value = false
+  }
+}
+
+async function selectSession(sessionId: number | null): Promise<void> {
+  const query = { ...route.query }
+  if (sessionId === null) delete query.session
+  else query.session = String(sessionId)
+  await router.replace({ query })
+}
+
+async function newChat(): Promise<void> {
+  messages.value = []
+  chatError.value = ''
+  await selectSession(null)
+}
+
+async function renameSession(session: AgentChatSessionOut): Promise<void> {
+  const title = window.prompt('Rename chat', session.title)?.trim()
+  if (!title || title === session.title) return
+  try {
+    await renameAgentSession(investorId.value, session.id, title)
+    sessions.value = await listAgentSessions(investorId.value)
+  } catch (err) {
+    chatError.value = err instanceof Error ? err.message : 'Could not rename this chat'
+  }
+}
+
+async function removeSession(session: AgentChatSessionOut): Promise<void> {
+  if (!window.confirm(`Delete "${session.title}" and its encrypted messages?`)) return
+  try {
+    await deleteAgentSession(investorId.value, session.id)
+    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+    if (activeSessionId.value === session.id) await newChat()
+  } catch (err) {
+    chatError.value = err instanceof Error ? err.message : 'Could not delete this chat'
+  }
 }
 
 async function sendMessage(): Promise<void> {
@@ -121,20 +212,17 @@ async function sendMessage(): Promise<void> {
   prompt.value = ''
   sending.value = true
   try {
-    const response = await sendAgentMessage(investorId.value, text)
-    const redactionLabel =
-      response.pii_redactions > 0
-        ? ` · ${response.pii_redactions} identifier${response.pii_redactions === 1 ? '' : 's'} redacted`
-        : ''
-    const responseMeta =
-      response.mode === 'external-ai'
-        ? `${response.provider} · ${response.model ?? 'configured model'} · de-identified context sent externally${redactionLabel}`
-        : `Local deterministic analysis · no external transmission${redactionLabel}`
-    messages.value.push({
-      role: 'assistant',
-      text: response.answer,
-      meta: responseMeta,
-    })
+    const response = await sendAgentMessage(
+      investorId.value,
+      text,
+      activeSessionId.value ?? undefined,
+    )
+    sessions.value = await listAgentSessions(investorId.value)
+    if (activeSessionId.value === response.session_id) {
+      await loadChatSession(response.session_id)
+    } else {
+      await selectSession(response.session_id)
+    }
   } catch (err) {
     messages.value.push({
       role: 'assistant',
@@ -146,8 +234,15 @@ async function sendMessage(): Promise<void> {
   }
 }
 
-watch(investorId, () => void load())
-onMounted(() => void load())
+watch(investorId, () => {
+  void load()
+  void loadChatWorkspace()
+})
+watch([activeModule, () => route.query.session], () => void loadChatWorkspace())
+onMounted(() => {
+  void load()
+  void loadChatWorkspace()
+})
 </script>
 
 <template>
@@ -447,12 +542,84 @@ onMounted(() => void load())
       </div>
 
       <div v-else-if="activeModule === 'chat'" class="chat-layout">
+        <aside class="chat-sessions">
+          <div class="session-head">
+            <div>
+              <p class="card-label">Conversations</p>
+              <small>Encrypted on this server</small>
+            </div>
+            <Button
+              icon="pi pi-plus"
+              text
+              rounded
+              aria-label="New chat"
+              title="New chat"
+              @click="newChat"
+            />
+          </div>
+          <Button
+            class="new-chat-button"
+            label="New chat"
+            icon="pi pi-plus"
+            outlined
+            size="small"
+            @click="newChat"
+          />
+          <p v-if="chatError" class="chat-error">{{ chatError }}</p>
+          <div class="session-list">
+            <p v-if="!chatLoading && sessions.length === 0" class="session-empty">
+              Your saved chats will appear here.
+            </p>
+            <div
+              v-for="session in sessions"
+              :key="session.id"
+              class="session-item"
+              :class="{ active: activeSessionId === session.id }"
+            >
+              <button class="session-select" type="button" @click="selectSession(session.id)">
+                <span>{{ session.title }}</span>
+                <small>{{ new Date(session.updated_at).toLocaleDateString() }}</small>
+              </button>
+              <div class="session-actions">
+                <button
+                  type="button"
+                  aria-label="Rename chat"
+                  title="Rename chat"
+                  @click="renameSession(session)"
+                >
+                  <i class="pi pi-pencil" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Delete chat"
+                  title="Delete chat"
+                  @click="removeSession(session)"
+                >
+                  <i class="pi pi-trash" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
         <article class="chat-panel">
           <div class="chat-head">
             <div><span class="online-dot" /><strong>Portfolio analyst</strong></div>
             <span>Server-side privacy boundary</span>
           </div>
           <div class="messages" aria-live="polite">
+            <div v-if="chatLoading" class="chat-state">
+              <i class="pi pi-spin pi-spinner" />
+              <span>Loading encrypted chat…</span>
+            </div>
+            <div v-else-if="messages.length === 0" class="chat-welcome">
+              <i class="pi pi-sparkles" />
+              <strong>Start a portfolio conversation</strong>
+              <p>
+                Ask about value, latest-day change, XIRR, allocation, concentration, integrity, or
+                tax readiness.
+              </p>
+              <small>Provider selection stays securely on the server.</small>
+            </div>
             <div
               v-for="(message, index) in messages"
               :key="index"
@@ -469,7 +636,7 @@ onMounted(() => void load())
               rows="2"
               maxlength="2000"
               placeholder="Ask about your portfolio…"
-              :disabled="sending"
+              :disabled="sending || chatLoading"
               @keydown.enter.exact.prevent="sendMessage"
               @keydown.meta.enter.prevent="sendMessage"
               @keydown.ctrl.enter.prevent="sendMessage"
@@ -629,6 +796,7 @@ h1 {
 .result-panel,
 .table-panel,
 .monitor-panel,
+.chat-sessions,
 .chat-panel,
 .chat-context {
   background: var(--fm-surface);
@@ -965,8 +1133,102 @@ h1 {
 }
 .chat-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(15rem, 0.8fr);
+  grid-template-columns: minmax(12rem, 0.55fr) minmax(0, 2fr) minmax(14rem, 0.7fr);
   gap: var(--fm-space-5);
+}
+.chat-sessions {
+  align-self: start;
+  padding: 0.8rem;
+}
+.session-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.session-head .card-label {
+  margin-bottom: 0.1rem;
+}
+.session-head small,
+.session-empty {
+  color: var(--fm-text-subtle);
+  font-size: 0.72rem;
+}
+.new-chat-button {
+  width: 100%;
+}
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+.session-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--fm-radius-md);
+}
+.session-item:hover,
+.session-item.active {
+  border-color: var(--fm-border);
+  background: var(--fm-surface-raised);
+}
+.session-item.active {
+  box-shadow: inset 3px 0 var(--p-primary-color);
+}
+.session-select {
+  min-width: 0;
+  padding: 0.65rem 0.35rem 0.65rem 0.7rem;
+  border: 0;
+  color: var(--fm-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.session-select span,
+.session-select small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-select small {
+  margin-top: 0.15rem;
+  color: var(--fm-text-subtle);
+}
+.session-actions {
+  display: flex;
+  padding-right: 0.3rem;
+  opacity: 0;
+}
+.session-item:hover .session-actions,
+.session-item:focus-within .session-actions,
+.session-item.active .session-actions {
+  opacity: 1;
+}
+.session-actions button {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--fm-text-subtle);
+  background: transparent;
+  cursor: pointer;
+}
+.session-actions button:hover {
+  color: var(--fm-text);
+  background: var(--fm-ground);
+}
+.chat-error {
+  margin: 0.65rem 0 0;
+  color: var(--fm-critical);
+  font-size: 0.75rem;
 }
 .chat-panel {
   min-height: 34rem;
@@ -1002,6 +1264,32 @@ h1 {
   gap: 0.75rem;
   padding: 1rem;
   overflow-y: auto;
+}
+.chat-state,
+.chat-welcome {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  flex: 1;
+  min-height: 17rem;
+  color: var(--fm-text-muted);
+  text-align: center;
+}
+.chat-state {
+  grid-template-columns: auto auto;
+  gap: 0.5rem;
+}
+.chat-welcome > i {
+  margin-bottom: 0.75rem;
+  color: var(--p-primary-color);
+  font-size: 1.5rem;
+}
+.chat-welcome strong {
+  color: var(--fm-text);
+}
+.chat-welcome p {
+  max-width: 28rem;
+  margin: 0.4rem 0;
 }
 .message {
   max-width: 82%;
@@ -1104,6 +1392,19 @@ h1 {
   .chat-layout {
     grid-template-columns: 1fr;
   }
+  .chat-sessions {
+    order: 1;
+  }
+  .chat-panel {
+    order: 2;
+  }
+  .chat-context {
+    order: 3;
+  }
+  .session-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 767px) {
   .agent-page {
@@ -1139,6 +1440,9 @@ h1 {
   }
   .message {
     max-width: 94%;
+  }
+  .session-list {
+    grid-template-columns: 1fr;
   }
 }
 </style>

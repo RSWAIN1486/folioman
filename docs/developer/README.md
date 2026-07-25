@@ -102,7 +102,7 @@ so `make test` (core + app suites) needs no environment setup. For ad-hoc local
 | Variable | Mode | Default | Purpose |
 |---|---|---|---|
 | `FOLIOMAN_SECRET_KEY` | both | dev placeholder | Django secret key — **set in production** |
-| `FOLIOMAN_FERNET_KEY` | server | (none) | PAN-encryption key — **required** in server mode (see [Secrets & keys](#secrets--keys)) |
+| `FOLIOMAN_FERNET_KEY` | server | (none) | PAN and redacted-chat encryption key — **required** in server mode (see [Secrets & keys](#secrets--keys)) |
 | `FOLIOMAN_DEBUG` | both | `0` | `1` enables DEBUG (never in production) |
 | `FOLIOMAN_DATA_DIR` | desktop | per-OS user-data dir (platformdirs) | SQLite DB + rotating logs location |
 | `FOLIOMAN_ALLOWED_HOSTS` | server | (empty) | Comma-separated allowed hostnames |
@@ -166,7 +166,7 @@ migration suite is verified to apply identically on SQLite and Postgres 17.
 
 ## Secrets & keys
 
-**Fernet key — PAN encryption at rest.** Resolution order:
+**Fernet key — PAN and redacted AI chat encryption at rest.** Resolution order:
 `FOLIOMAN_FERNET_KEY` env → `FERNET_KEY_PATH` file → dev fallback (tests only).
 
 - **Desktop**: auto-generated on first run at `FOLIOMAN_DATA_DIR/fernet.key`
@@ -174,8 +174,8 @@ migration suite is verified to apply identically on SQLite and Postgres 17.
 - **Server**: **must** set `FOLIOMAN_FERNET_KEY` (generate with
   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
   Server refuses to start without it (`manage.py check` error E001).
-- **Recovery**: losing the Fernet key makes existing PANs **unrecoverable** —
-  they are encrypted at rest. Back it up. Rotation is manual in v1 (decrypt-all
+- **Recovery**: losing the Fernet key makes existing PANs, chat titles, and chat
+  messages **unrecoverable**. Back it up. Rotation is manual in v1 (decrypt-all
   with the old key, re-encrypt with the new).
 
 The dev `SECRET_KEY` / Fernet fallbacks are local-only; never use them in production.

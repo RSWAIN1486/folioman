@@ -35,14 +35,24 @@ text, transaction narration, or source references into that context.
 
 Chat applies defence-in-depth redaction for the selected investor's known name,
 email, PAN and folio numbers, plus common PAN, email, Indian phone, and labelled
-account/folio patterns. Messages are not persisted by Folioman.
+account/folio patterns. Only the resulting redacted user text and assistant
+response are persisted. Session titles and message content are encrypted with
+Folioman's Fernet key; raw user text is never written to the database.
+
+Every session is scoped to both the authenticated owner and selected investor.
+The chat UI supports multiple sessions, rename/delete controls, and stores the
+selected session ID in the URL so a refresh restores that conversation. Session
+history is server-side rather than in browser storage, so the hosted web and
+desktop clients use the same behavior against their respective databases.
 
 External requests receive only an explicit allow-list: dates, deterministic
 metrics, findings, allocation, current scheme names/values, formula notes, and
 assumptions. They never receive an ORM object, database row, raw CAS document,
 or transaction narration. OpenAI requests set `store=false`. OpenRouter
 requests set `store=false`, require Zero Data Retention routing, and deny data
-collection per request.
+collection per request. To provide conversational continuity without sending an
+unbounded transcript, an external request includes at most the 12 most recent
+persisted redacted messages.
 
 Free-form text can contain identifiers that local pattern matching does not
 recognise. The UI therefore warns users not to paste personal identifiers. The
@@ -90,6 +100,9 @@ storage. Do not embed a provider key in a distributable desktop build.
 
 - `GET /api/investors/{investor_id}/agent/overview`
 - `POST /api/investors/{investor_id}/agent/chat`
+- `GET|POST /api/investors/{investor_id}/agent/sessions`
+- `GET|PATCH|DELETE /api/investors/{investor_id}/agent/sessions/{session_id}`
 
-Both routes use the existing owner-scoped investor lookup and therefore return
-404 for an investor belonging to another authenticated user.
+All routes use the existing owner-scoped investor lookup. Session lookups also
+require matching `owned_by` and `investor_id`, so a session or investor belonging
+to another authenticated user returns the same non-revealing 404.

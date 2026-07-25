@@ -299,6 +299,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/investors/{investor_id}/agent/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agent Chat Sessions */
+        get: operations["folioman_app_api_agent_list_agent_chat_sessions"];
+        put?: never;
+        /** Create Agent Chat Session */
+        post: operations["folioman_app_api_agent_create_agent_chat_session"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/investors/{investor_id}/agent/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Chat Session */
+        get: operations["folioman_app_api_agent_get_agent_chat_session"];
+        put?: never;
+        post?: never;
+        /** Delete Agent Chat Session */
+        delete: operations["folioman_app_api_agent_delete_agent_chat_session"];
+        options?: never;
+        head?: never;
+        /** Update Agent Chat Session */
+        patch: operations["folioman_app_api_agent_update_agent_chat_session"];
+        trace?: never;
+    };
     "/api/investors/{investor_id}/exports/capital-gains": {
         parameters: {
             query?: never;
@@ -1011,6 +1048,38 @@ export interface components {
         AgentChatIn: {
             /** Message */
             message: string;
+            /** Session Id */
+            session_id?: number | null;
+        };
+        /** AgentChatMessageOut */
+        AgentChatMessageOut: {
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Data As Of */
+            data_as_of?: string | null;
+            /** External Transmission */
+            external_transmission: boolean;
+            /** Id */
+            id: number;
+            /** Model */
+            model?: string | null;
+            /** Pii Redactions */
+            pii_redactions: number;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "local" | "openai" | "openrouter";
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
         };
         /** AgentChatOut */
         AgentChatOut: {
@@ -1039,8 +1108,56 @@ export interface components {
              * @enum {string}
              */
             provider: "local" | "openai" | "openrouter";
+            /** Session Id */
+            session_id: number;
             /** Sources */
             sources: string[];
+        };
+        /** AgentChatSessionDetailOut */
+        AgentChatSessionDetailOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Messages */
+            messages: components["schemas"]["AgentChatMessageOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AgentChatSessionIn */
+        AgentChatSessionIn: {
+            /** Title */
+            title?: string | null;
+        };
+        /** AgentChatSessionOut */
+        AgentChatSessionOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AgentChatSessionUpdate */
+        AgentChatSessionUpdate: {
+            /** Title */
+            title: string;
         };
         /** AgentFindingOut */
         AgentFindingOut: {
@@ -3022,6 +3139,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentOverviewOut"];
+                };
+            };
+        };
+    };
+    folioman_app_api_agent_list_agent_chat_sessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatSessionOut"][];
+                };
+            };
+        };
+    };
+    folioman_app_api_agent_create_agent_chat_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatSessionOut"];
+                };
+            };
+        };
+    };
+    folioman_app_api_agent_get_agent_chat_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatSessionDetailOut"];
+                };
+            };
+        };
+    };
+    folioman_app_api_agent_delete_agent_chat_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    folioman_app_api_agent_update_agent_chat_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                investor_id: number;
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatSessionUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatSessionOut"];
                 };
             };
         };

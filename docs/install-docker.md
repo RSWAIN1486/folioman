@@ -52,8 +52,8 @@ Generate the two keys and paste them into `server/.env`:
 # FOLIOMAN_SECRET_KEY — signs sessions and JWTs
 python3 -c "import secrets; print(secrets.token_urlsafe(64))"
 
-# FOLIOMAN_FERNET_KEY — encrypts PANs at rest. BACK THIS UP — without it,
-# already-encrypted PANs are unrecoverable.
+# FOLIOMAN_FERNET_KEY — encrypts PANs and redacted AI chats at rest.
+# BACK THIS UP — without it, already-encrypted data is unrecoverable.
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 

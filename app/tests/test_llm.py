@@ -56,7 +56,15 @@ def test_openrouter_uses_fixed_endpoint_privacy_controls_and_allowlisted_context
         "raw_cas": "must never leave",
     }
 
-    answer = llm.answer_with_provider(config, overview, "Explain the health score")
+    answer = llm.answer_with_provider(
+        config,
+        overview,
+        "Explain the health score",
+        history=[
+            {"role": "user", "content": "Earlier redacted question"},
+            {"role": "assistant", "content": "Earlier answer"},
+        ],
+    )
 
     assert answer.provider == "openrouter"
     assert captured["url"] == "https://openrouter.ai/api/v1/responses"
@@ -70,6 +78,8 @@ def test_openrouter_uses_fixed_endpoint_privacy_controls_and_allowlisted_context
     assert "Private Person" not in outbound
     assert "private@example.com" not in outbound
     assert "must never leave" not in outbound
+    assert "Earlier redacted question" in outbound
+    assert "Earlier answer" in outbound
 
 
 def test_provider_requires_matching_key_and_model(monkeypatch):
